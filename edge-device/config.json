@@ -1,0 +1,44 @@
+{
+  "device": {
+    "thing_id": "device-001",
+    "mqtt": {
+      "dt_broker": "tcp://localhost:1883",
+      "raw_broker": "tcp://localhost:1884",
+      "publish_raw": true
+    },
+    "simulated": true,
+    "sensors": [
+      {
+        "datastream_id": "temperature-1",
+        "type": "temperature",
+        "interval": "10s",
+        "enabled": true
+      },
+      {
+        "datastream_id": "humidity-1",
+        "type": "humidity",
+        "interval": "10s",
+        "enabled": true
+      },
+      {
+        "datastream_id": "power-1",
+        "type": "power",
+        "interval": "1s",
+        "enabled": true
+      },
+      {
+        "datastream_id": "light-1",
+        "type": "light",
+        "interval": "10s",
+        "enabled": true
+      }
+    ]
+  },
+  "control": {
+    "pip": {
+      "cache_size": 100,
+      "threshold": 0.8,
+      "max_interval": "30s"
+    }
+  }
+}

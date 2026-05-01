@@ -1,0 +1,49 @@
+:root {
+  /* Backgrounds */
+  --bg-base: #0f0f1a;
+  --bg-surface: #161625;
+  --bg-panel: #1E1E2E;
+  --bg-panel-2: #1a1a2e;
+  --bg-elevated: #252536;
+  --bg-deeper: #0a0a14;
+
+  /* Borders */
+  --border: #252536;
+  --border-strong: #333;
+  --border-muted: #1E1E2E;
+
+  /* Text */
+  --text-strong: #FFFFFF;
+  --text-primary: #E2E8F0;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-faint: #64748B;
+  --text-faintest: #475569;
+
+  /* Brand */
+  --indigo: #4F46E5;
+  --indigo-light: #818CF8;
+  --violet: #7C3AED;
+  --violet-light: #A78BFA;
+  --grad-brand: linear-gradient(90deg, #4F46E5 0%, #7C3AED 100%);
+  --grad-hero: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+
+  /* Status / accents */
+  --green: #34D399;
+  --yellow: #FBBF24;
+  --orange: #F59E0B;
+  --cyan: #06B6D4;
+  --cyan-light: #22D3EE;
+  --red: #EF4444;
+
+  /* Typography */
+  --font-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Layout */
+  --sidebar-w: 220px;
+  --topbar-h: 56px;
+
+  /* Shadows */
+  --shadow-panel: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
