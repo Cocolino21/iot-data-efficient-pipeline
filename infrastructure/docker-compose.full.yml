@@ -1,11 +1,11 @@
 services:
   emqx-dt:
-    build:
-      context: .
-      dockerfile: Dockerfile.emqx
+    image: emqx/emqx-enterprise:latest
     ports:
       - "1883:1883"
       - "18083:18083"
+    volumes:
+      - ./emqx-dt.conf:/opt/emqx/etc/emqx.conf
     depends_on:
       kafka-init:
         condition: service_completed_successfully
@@ -14,6 +14,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+#  emqx-raw:
+#    image: emqx/emqx-enterprise:latest
+#    ports:
+#      - "1884:1883"
+#      - "18084:18083"   # EMQX dashboard (raw broker)
+#    volumes:
+#      - ./emqx-raw.conf:/opt/emqx/etc/emqx.conf
+#    healthcheck:
+#      test: ["CMD", "emqx", "ping"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 10
+
 
   influxdb:
     image: influxdb:2
@@ -73,6 +87,47 @@ services:
           --partitions 1 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --describe
 
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    ports:
+      - "9308:9308"
+    command:
+      - --kafka.server=kafka:29092
+    depends_on:
+      kafka:
+          condition: service_healthy
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    ports:
+      - "9187:9187"
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@timescaledb:5433/iot?sslmode=disable"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - kafka-exporter
+      - postgres-exporter
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local-kraft-cluster
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
+    depends_on:
+      - kafka
+
   timescaledb:
     image: timescale/timescaledb:latest-pg17
     ports:
@@ -89,3 +144,25 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+
+  sink-service:
+    build:
+      context: ../sink-service
+    restart: unless-stopped
+    env_file:
+      - ../sink-service/.env
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy

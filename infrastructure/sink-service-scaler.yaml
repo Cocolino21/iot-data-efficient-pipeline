@@ -1,0 +1,20 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: sink-service
+  namespace: iot
+spec:
+  scaleTargetRef:
+    name: sink-service
+  pollingInterval: 10
+  cooldownPeriod: 60
+  minReplicaCount: 0
+  maxReplicaCount: 8
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: host.minikube.internal:9094
+        consumerGroup: timescale-writer-group
+        topic: telemetry.observations
+        lagThreshold: "1000"
+        offsetResetPolicy: earliest

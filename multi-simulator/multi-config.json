@@ -1,5 +1,5 @@
 {
-  "device_count": 500,
+  "device_count": 5000,
   "device_prefix": "device",
   "mqtt_broker": "tcp://localhost:1883",
   "raw_broker": "tcp://localhost:1884",

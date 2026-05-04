@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sink-service
+  namespace: iot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sink-service
+  template:
+    metadata:
+      labels:
+        app: sink-service
+    spec:
+      containers:
+        - name: sink-service
+          image: sink-service:dev
+          imagePullPolicy: Never
+          env:
+            - name: KAFKA_BROKER
+              value: host.minikube.internal:9094
+            - name: KAFKA_TOPIC
+              value: telemetry.observations
+            - name: KAFKA_GROUP_ID
+              value: timescale-writer-group
+            - name: DB_URL
+              value: postgres://postgres:postgres@host.minikube.internal:5433/iot?sslmode=disable

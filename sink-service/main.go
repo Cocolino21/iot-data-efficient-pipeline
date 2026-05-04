@@ -66,6 +66,7 @@ func main() {
 
 	var messageBatch []kafka.Message
 	var payloadBatch []Observation
+	var batchStart time.Time
 
 	// Helper function to flush the buffer to the DB and commit to Kafka
 	flush := func() {
@@ -118,18 +119,20 @@ func main() {
 
 	// Main Consumer Loop
 	for {
-		// Use a context with timeout to enforce the maxBatchAge
-		fetchCtx, fetchCancel := context.WithTimeout(ctx, maxBatchAge)
+		fetchCtx := ctx
+		var fetchCancel context.CancelFunc = func() {}
+		if len(messageBatch) > 0 {
+			fetchCtx, fetchCancel = context.WithDeadline(ctx, batchStart.Add(maxBatchAge))
+		}
+
 		m, err := r.FetchMessage(fetchCtx)
 		fetchCancel()
 
 		if err != nil {
-			// If we hit the timeout, it's time to flush whatever we have
 			if errors.Is(err, context.DeadlineExceeded) {
 				flush()
 				continue
 			}
-			// If the main context was canceled (shutdown signal)
 			if errors.Is(err, context.Canceled) {
 				flush()
 				break
@@ -144,11 +147,12 @@ func main() {
 			continue
 		}
 
-		// Add to buffer
+		if len(messageBatch) == 0 {
+			batchStart = time.Now()
+		}
 		messageBatch = append(messageBatch, m)
 		payloadBatch = append(payloadBatch, payload)
 
-		// Flush if we hit the batch limit
 		if len(messageBatch) >= maxBatchSize {
 			flush()
 		}

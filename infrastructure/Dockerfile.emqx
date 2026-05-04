@@ -1,0 +1,2 @@
+FROM emqx/emqx-enterprise:latest
+COPY conf/emqx-dt.conf /opt/emqx/etc/emqx.conf
