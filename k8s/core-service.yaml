@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-service
+  namespace: iot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-service
+  template:
+    metadata:
+      labels:
+        app: core-service
+    spec:
+      containers:
+        - name: core-service
+          image: core-service:dev
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8083
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://host.minikube.internal:5433/iot
+            - name: SPRING_DATASOURCE_USERNAME
+              value: postgres
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: postgres
+            - name: APP_FRONTEND_BASE_URL
+              value: http://localhost:5173
+            - name: APP_CORS_ALLOWED_ORIGINS
+              value: http://localhost:5173
+            - name: APP_DEMO_SEED
+              value: "true"
+          envFrom:
+            - secretRef:
+                name: core-service-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-service
+  namespace: iot
+spec:
+  type: NodePort
+  selector:
+    app: core-service
+  ports:
+    - port: 8083
+      targetPort: 8083
+      nodePort: 30083

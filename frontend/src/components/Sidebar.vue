@@ -1,5 +1,10 @@
 <script setup>
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useAuthStore } from '@/stores/auth.js'
+
+const auth = useAuthStore()
+const logoTarget = computed(() => (auth.isAuthenticated ? '/dashboard' : '/'))
 
 const items = [
   { to: '/dashboard', label: 'Dashboard', icon: 'home' },
@@ -10,7 +15,7 @@ const items = [
 
 <template>
   <aside class="sidebar">
-    <RouterLink to="/" class="logo">Horizon</RouterLink>
+    <RouterLink :to="logoTarget" class="logo">Horizon</RouterLink>
     <nav class="nav">
       <RouterLink
         v-for="i in items"

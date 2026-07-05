@@ -11,6 +11,8 @@ type SensorConfig struct {
 	Type         string `json:"type"`
 	Interval     string `json:"interval"`
 	Enabled      *bool  `json:"enabled,omitempty"`
+	DatasetDir   string `json:"dataset_dir,omitempty"`  // for type "ukdale": the house folder
+	DatasetFile  string `json:"dataset_file,omitempty"` // for type "ukdale": defaults to mains.dat
 }
 
 type MQTTConfig struct {

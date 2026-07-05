@@ -1,0 +1,29 @@
+@startuml
+  title Un ciclu al buclei de control
+
+  participant "MetricsPoller" as MP
+  participant "ControllerRegistry" as REG
+  participant "PrometheusClient" as PC
+  participant "Prometheus" as PROM
+  participant "LagController\n(Hysteresis | PID)" as CTRL
+  participant "MqttActuator" as ACT
+
+  MP -> REG : active()
+  REG --> MP : LagController (sau null → mode NONE)
+  alt controller == null
+    MP -> MP : lastAdjustment = 0 (buclă dezactivată)
+  else controller activ
+    MP -> PC : getConsumerLag()
+    PC -> PROM : GET /api/v1/query\nsum(kafka_consumergroup_lag{...})
+    PROM --> PC : lag
+    PC --> MP : lag
+    MP -> CTRL : compute(lag)
+    CTRL --> MP : adjustment (clamped)
+    MP -> MP : broadcast = |adjustment| > deadZone
+    opt broadcast
+      MP -> ACT : publishPipPercentage(adjustment)
+      MP -> MP : broadcastCounter++
+    end
+    MP -> MP : lastAdjustment = adjustment (gauge)
+  end
+  @enduml

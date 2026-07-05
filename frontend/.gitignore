@@ -3,3 +3,7 @@ dist
 .vite
 *.log
 .DS_Store
+
+# Vite local-only env files (API keys, etc.)
+.env.local
+.env.*.local

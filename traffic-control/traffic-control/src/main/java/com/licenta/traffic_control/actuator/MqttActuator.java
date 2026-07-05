@@ -53,13 +53,23 @@ public class MqttActuator {
 
     public void publishPipPercentage(double pct) {
         String payload = "{\"percentage\":" + pct + "}";
+        publish(broadcastTopic, payload);
+    }
+
+    public void publishRawMode(String thingId, String datastreamId, int ttlSeconds) {
+        String topic = "cmd/control/" + thingId;
+        String payload = "{\"mode\":\"raw\",\"datastream_id\":\"" + datastreamId + "\",\"ttl_s\":" + ttlSeconds + "}";
+        publish(topic, payload);
+    }
+
+    private void publish(String topic, String payload) {
         MqttMessage msg = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
-        msg.setQos(0);
+        msg.setQos(2);
         try {
-            client.publish(broadcastTopic, msg);
-            log.info("published to {}: {}", broadcastTopic, payload);
+            client.publish(topic, msg);
+            log.info("published to {}: {}", topic, payload);
         } catch (MqttException e) {
-            log.error("MQTT publish failed: {}", e.getMessage());
+            log.error("MQTT publish to {} failed: {}", topic, e.getMessage());
         }
     }
 }

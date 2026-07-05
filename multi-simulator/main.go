@@ -30,6 +30,8 @@ type SensorTemplate struct {
 	DatastreamID string `json:"datastream_id"`
 	Type         string `json:"type"`
 	Interval     string `json:"interval"`
+	DatasetDir   string `json:"dataset_dir,omitempty"`
+	DatasetFile  string `json:"dataset_file,omitempty"`
 }
 
 func loadMultiConfig(path string) (*MultiConfig, error) {
@@ -44,7 +46,6 @@ func loadMultiConfig(path string) (*MultiConfig, error) {
 	return &cfg, nil
 }
 
-// buildDeviceConfig creates a per-device Config with unique thing ID and datastream IDs.
 func buildDeviceConfig(mc *MultiConfig, deviceNum int) *config.Config {
 	thingID := fmt.Sprintf("%s-%03d", mc.DevicePrefix, deviceNum)
 
@@ -57,6 +58,8 @@ func buildDeviceConfig(mc *MultiConfig, deviceNum int) *config.Config {
 			Type:         s.Type,
 			Interval:     s.Interval,
 			Enabled:      &enabled,
+			DatasetDir:   s.DatasetDir,
+			DatasetFile:  s.DatasetFile,
 		}
 	}
 
@@ -152,22 +155,22 @@ func main() {
 		mgr := device.NewManager(dtClient, rawClient, cfg, "")
 
 		for _, sc := range cfg.Device.Sensors {
-			if err := mgr.AddSensor(sc.DatastreamID, sc.Type, sc.Interval); err != nil {
+			if err := mgr.AddSensor(sc); err != nil {
 				log.Fatalf("device %s: adding sensor %s: %v", cfg.Device.ThingID, sc.DatastreamID, err)
 			}
 		}
 
 		controlTopic := fmt.Sprintf("cmd/control/%s", cfg.Device.ThingID)
-		if err := dtClient.Subscribe(controlTopic, mgr.HandleControlMessage); err != nil {
+		if err := dtClient.Subscribe(controlTopic, 2, mgr.HandleControlMessage); err != nil {
 			log.Fatalf("device %s: subscribing to %s: %v", cfg.Device.ThingID, controlTopic, err)
 		}
 
-		if err := dtClient.Subscribe("cmd/control/broadcast", mgr.HandleControlMessage); err != nil {
+		if err := dtClient.Subscribe("cmd/control/broadcast", 2, mgr.HandleControlMessage); err != nil {
 			log.Fatalf("device %s: subscribing to broadcast control: %v", cfg.Device.ThingID, err)
 		}
 
 		configTopic := fmt.Sprintf("cmd/config/%s", cfg.Device.ThingID)
-		if err := dtClient.Subscribe(configTopic, mgr.HandleConfigMessage); err != nil {
+		if err := dtClient.Subscribe(configTopic, 2, mgr.HandleConfigMessage); err != nil {
 			log.Fatalf("device %s: subscribing to %s: %v", cfg.Device.ThingID, configTopic, err)
 		}
 

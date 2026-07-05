@@ -13,7 +13,12 @@ import (
 )
 
 func main() {
-	cfg, err := config.Load("config.json")
+	cfgPath := "config.json"
+	if len(os.Args) > 1 {
+		cfgPath = os.Args[1]
+	}
+
+	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		log.Fatalf("loading config: %v", err)
 	}
@@ -33,7 +38,7 @@ func main() {
 		defer rawClient.Close()
 	}
 
-	mgr := device.NewManager(dtClient, rawClient, cfg, "config.json")
+	mgr := device.NewManager(dtClient, rawClient, cfg, cfgPath)
 
 	cloudInit := mgr.WaitForInit(10 * time.Second)
 
@@ -42,19 +47,19 @@ func main() {
 			if sc.Enabled != nil && !*sc.Enabled {
 				continue
 			}
-			if err := mgr.AddSensor(sc.DatastreamID, sc.Type, sc.Interval); err != nil {
+			if err := mgr.AddSensor(sc); err != nil {
 				log.Fatalf("adding sensor %s: %v", sc.DatastreamID, err)
 			}
 		}
 	}
 
 	configTopic := fmt.Sprintf("cmd/config/%s", cfg.Device.ThingID)
-	if err := dtClient.Subscribe(configTopic, mgr.HandleConfigMessage); err != nil {
+	if err := dtClient.Subscribe(configTopic, 2, mgr.HandleConfigMessage); err != nil {
 		log.Fatalf("subscribing to %s: %v", configTopic, err)
 	}
 
 	controlTopic := fmt.Sprintf("cmd/control/%s", cfg.Device.ThingID)
-	if err := dtClient.Subscribe(controlTopic, mgr.HandleControlMessage); err != nil {
+	if err := dtClient.Subscribe(controlTopic, 2, mgr.HandleControlMessage); err != nil {
 		log.Fatalf("subscribing to %s: %v", controlTopic, err)
 	}
 

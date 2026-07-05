@@ -6,6 +6,7 @@ import { GaugeChart } from 'echarts/charts'
 import { TooltipComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
 import { useDevicesStore } from '@/stores/devices.js'
+import { useTimeStore } from '@/stores/time.js'
 import { api } from '@/services/api.js'
 import { colorForType } from './useChartTheme.js'
 
@@ -19,6 +20,7 @@ const props = defineProps({
 })
 
 const devices = useDevicesStore()
+const time = useTimeStore()
 const sensors = computed(() => props.datastreamIds.map((id) => devices.allSensors.find((s) => s.id === id)).filter(Boolean))
 
 // Reasonable defaults per sensor type so gauges look right without explicit min/max.
@@ -34,15 +36,21 @@ function rangeFor(type) {
   }
 }
 
-const liveValues = computed(() => devices.liveValues)
 const values = ref({})
 
-watch([sensors, liveValues], () => {
+async function loadLatest() {
   for (const s of sensors.value) {
-    const lv = devices.liveValues[s.id]
-    values.value[s.id] = lv ? lv.value : api.latest(s.id, s.type).value
+    try {
+      const obs = await api.observations(s.id, s.type, Date.now() - 60 * 60_000, Date.now(), 1)
+      const last = obs[obs.length - 1]
+      values.value[s.id] = last ? last.value : 0
+    } catch {
+      values.value[s.id] = 0
+    }
   }
-}, { immediate: true, deep: true })
+}
+
+watch(() => [props.datastreamIds.join(','), time.refreshTick, devices.list.length], loadLatest, { immediate: true })
 
 function buildOption(s) {
   const [defaultMin, defaultMax] = rangeFor(s.type)

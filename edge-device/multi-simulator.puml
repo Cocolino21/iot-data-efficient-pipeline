@@ -1,0 +1,44 @@
+@startuml
+namespace multi-simulator {
+    class "MultiConfig" << (S,Aquamarine) >> {
+        + DeviceCount int
+        + DevicePrefix string
+        + MQTTBroker string
+        + RawBroker string
+        + PublishRaw bool
+        + StatusPort int
+        + Sensors []SensorTemplate
+        + PIP config.PIPConfig
+
+    }
+    class "SensorTemplate" << (S,Aquamarine) >> {
+        + DatastreamID string
+        + Type string
+        + Interval string
+        + DatasetDir string
+        + DatasetFile string
+
+    }
+    class "deviceInstance" << (S,Aquamarine) >> {
+        - manager *device.Manager
+        - client *mqtt.Client
+        - rawClient *mqtt.Client
+
+    }
+    class "statusResponse" << (S,Aquamarine) >> {
+        + DeviceCount int
+        + Devices []device.DeviceStatus
+
+    }
+}
+
+
+"multi-simulator.MultiConfig" o-- "config.PIPConfig"
+"multi-simulator.MultiConfig" o-- "multi-simulator.SensorTemplate"
+"multi-simulator.statusResponse" o-- "device.DeviceStatus"
+
+"multi-simulator.deviceInstance" o-- "device.Manager"
+"multi-simulator.deviceInstance" o-- "mqtt.Client"
+
+
+@enduml

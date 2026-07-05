@@ -1,0 +1,45 @@
+{
+  "device_count": 10,
+  "device_prefix": "device",
+  "mqtt_broker": "tcp://localhost:1883",
+  "raw_broker": "tcp://localhost:1884",
+  "publish_raw": false,
+  "status_port": 8090,
+  "sensors": [
+    {
+      "datastream_id": "mains_t10",
+      "type": "ukdale",
+      "interval": "10ms",
+      "dataset_dir": "../data/ukdale/house_1"
+    },
+    {
+      "datastream_id": "mains_t11",
+      "type": "ukdale",
+      "interval": "10ms",
+      "dataset_dir": "../data/ukdale/house_1"
+    },
+    {
+      "datastream_id": "mains_t12",
+      "type": "ukdale",
+      "interval": "10ms",
+      "dataset_dir": "../data/ukdale/house_1"
+    },
+    {
+      "datastream_id": "mains_t13",
+      "type": "ukdale",
+      "interval": "10ms",
+      "dataset_dir": "../data/ukdale/house_1"
+    },
+    {
+      "datastream_id": "mains_t14",
+      "type": "ukdale",
+      "interval": "10ms",
+      "dataset_dir": "../data/ukdale/house_1"
+    }
+  ],
+  "pip": {
+    "cache_size": 200,
+    "threshold": 0.1,
+    "max_interval": "30s"
+  }
+}

@@ -7,10 +7,11 @@
 .DS_Store
 Thumbs.db
 
-# Env
+# Env / secrets
 .env
 .env.local
 *.local
+.secrets
 
 # Logs
 *.log
@@ -30,6 +31,15 @@ target/
 *.class
 *.jar
 !**/.mvn/wrapper/maven-wrapper.jar
+
+# Building Data Genome Project 2 dataset — public data, fetched separately, not stored in repo
+data/building-data-genome-project-2-master/data/
+
+# UK-DALE raw meter files — large public data, fetched separately (metadata YAMLs kept)
+data/ukdale/**/*.dat
+
+# Oversized regenerable figure (83MB) — excluded to keep the push small
+data/building-data-genome-project-2-master/figures/pred_longterm2.pdf
 
 # Node
 node_modules/

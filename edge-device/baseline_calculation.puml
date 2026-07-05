@@ -1,0 +1,41 @@
+@startuml
+class CalibrationOrchestrator {
+    - jdbc : JdbcTemplate
+    - mqttActuator : MqttActuator
+    - settings : CalibrationSettings
+    + tick()
+    - flagNeedsCalibration()
+    - reclaimExpiredLeases()
+    - claimNewWork()
+  }
+
+  class CalibrationSettings <<@ConfigurationProperties("calibration")>> {
+    - maxConcurrent : int = 5
+    - collectionTtlSeconds : int = 86400
+    - baselineDays : int = 5
+    - pollIntervalMs : long = 60000
+  }
+
+  class MqttActuator {
+    + publishRawMode(thingId, datastreamId, ttl)
+  }
+
+  class JdbcTemplate <<Spring>>
+
+  database "TimescaleDB" {
+
+  }
+
+  CalibrationOrchestrator --> CalibrationSettings : settings
+  CalibrationOrchestrator --> MqttActuator
+  CalibrationOrchestrator --> JdbcTemplate
+  JdbcTemplate ..> "TimescaleDB"
+
+
+  note right of CalibrationOrchestrator
+    tick() (@Scheduled, pollIntervalMs):
+    1. flagNeedsCalibration
+    2. reclaimExpiredLeases
+    3. claimNewWork
+  end note
+@enduml

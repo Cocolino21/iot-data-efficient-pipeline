@@ -1,11 +1,16 @@
 <script setup>
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useAuthStore } from '@/stores/auth.js'
+
+const auth = useAuthStore()
+const logoTarget = computed(() => (auth.isAuthenticated ? '/dashboard' : '/'))
 </script>
 
 <template>
   <div class="landing">
     <header class="nav">
-      <div class="logo">Horizon</div>
+      <RouterLink :to="logoTarget" class="logo">Horizon</RouterLink>
       <nav class="links">
         <a href="#features">Features</a>
         <a href="#about">About</a>

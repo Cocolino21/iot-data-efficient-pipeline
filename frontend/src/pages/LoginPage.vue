@@ -1,8 +1,17 @@
 <script setup>
-import { useRouter } from 'vue-router'
-const router = useRouter()
-function fakeSignIn() {
-  router.push('/dashboard')
+import { api } from '@/services/api.js'
+import { useAuthStore } from '@/stores/auth.js'
+
+const auth = useAuthStore()
+
+function signInWithGoogle() {
+  // Clear the "fake logout" flag so /api/auth/me is trusted again when we
+  // come back from Google.
+  auth.beginLogin()
+  window.location.href = api.loginUrl()
+}
+function notImplemented() {
+  alert('Only Google sign-in is wired up for this demo.')
 }
 </script>
 
@@ -16,7 +25,7 @@ function fakeSignIn() {
       <h2>Welcome back</h2>
       <p>Sign in to access your smart home dashboard</p>
 
-      <button class="provider google" @click="fakeSignIn">
+      <button class="provider google" @click="signInWithGoogle">
         <span class="icon-g">G</span>
         <span>Continue with Google</span>
       </button>
@@ -25,7 +34,7 @@ function fakeSignIn() {
         <span></span><label>OR</label><span></span>
       </div>
 
-      <button class="provider github" @click="fakeSignIn">
+      <button class="provider github" @click="notImplemented">
         <span class="icon-h">⌥</span>
         <span>Continue with GitHub</span>
       </button>

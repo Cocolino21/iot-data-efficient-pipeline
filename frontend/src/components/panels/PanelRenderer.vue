@@ -22,8 +22,8 @@ const quality = computed(() => {
   const s = firstSensor.value
   if (!s) return 'good'
   const lv = devices.liveValues[s.id]
-  const v = lv ? lv.value : api.latest(s.id, s.type).value
-  return api.qualityFor(s.type, v)
+  if (!lv) return 'good'
+  return api.qualityFor(s.type, lv.value)
 })
 
 const componentMap = {

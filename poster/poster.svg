@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1100" width="1400" height="1100">
+  <!--
+    Poster licență, design editorial.
+    Toate textele sunt elemente <text> editabile în Figma (nu paths).
+
+    Placeholders de editat:
+      Titlu (2 linii)        : sus stânga
+      Student / Coordonator  : banda metadata
+      Universitate / Sesiune : footer
+      Dreptunghi punctat     : diagramă arhitectură (înlocuiește în Figma)
+
+    Titluri sugerate:
+      1. „Platformă IoT adaptivă pentru telemetrie smart home cu pipeline auto-reglabil și agregate multi-rezoluție" (cel afișat)
+      2. „Sistem IoT cu control adaptiv al fluxului de date și detecție de anomalii bazată pe baseline dinamic"
+  -->
+
+  <!-- ===== Background ===== -->
+  <rect x="0" y="0" width="1400" height="1100" fill="#EFE8D9"/>
+
+  <!-- ===== Hairline accents (top) ===== -->
+  <rect x="0" y="0" width="1400" height="6" fill="#9C2A2A"/>
+  <line x1="60" y1="46" x2="1340" y2="46" stroke="#9C2A2A" stroke-width="0.75"/>
+
+  <!-- ===== Kicker (top-left small caps) ===== -->
+  <text x="60" y="38" font-family="Inter, 'Helvetica Neue', sans-serif" font-size="11" font-weight="700" fill="#9C2A2A" letter-spacing="3.5">LUCRARE DE LICENȚĂ &#183; SESIUNEA IUNIE 2026</text>
+
+  <!-- ===== TITLE (serif, 2 lines) ===== -->
+  <text x="60" y="124" font-family="Georgia, 'Times New Roman', serif" font-size="48" font-weight="700" fill="#1A1410" letter-spacing="-0.5">Platformă IoT adaptivă pentru telemetrie</text>
+  <text x="60" y="174" font-family="Georgia, 'Times New Roman', serif" font-size="48" font-style="italic" font-weight="400" fill="#1A1410" letter-spacing="-0.5">smart home cu pipeline auto-reglabil</text>
+
+  <!-- ===== Subtitle / lead sentence ===== -->
+  <text x="60" y="216" font-family="Inter, 'Helvetica Neue', sans-serif" font-size="14" font-weight="400" fill="#5A4F40">O arhitectură distribuită cu două bucle de control: una pe ingerare, una pe analytics.</text>
+
+  <!-- ===== Meta band (Student / Coordonator) ===== -->
+  <g transform="translate(60, 252)">
+    <text font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#9C2A2A" letter-spacing="2">STUDENT</text>
+    <text x="0" y="22" font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#1A1410">[Nume Prenume]</text>
+  </g>
+  <g transform="translate(320, 252)">
+    <text font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#9C2A2A" letter-spacing="2">COORDONATOR ȘTIINȚIFIC</text>
+    <text x="0" y="22" font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#1A1410">[prof. dr. ing. Nume]</text>
+  </g>
+  <g transform="translate(680, 252)">
+    <text font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#9C2A2A" letter-spacing="2">PROGRAM</text>
+    <text x="0" y="22" font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#1A1410">[Specializare / Anul IV]</text>
+  </g>
+  <g transform="translate(940, 252)">
+    <text font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#9C2A2A" letter-spacing="2">UNIVERSITATE</text>
+    <text x="0" y="22" font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#1A1410">Universitatea Tehnică din Cluj-Napoca</text>
+  </g>
+
+  <line x1="60" y1="298" x2="1340" y2="298" stroke="#C9BFA8" stroke-width="0.75"/>
+
+  <!-- =====================================================
+       COLUMN 1: Context (Enunț + Obiectiv principal + Obiective sec.)
+       ===================================================== -->
+  <g transform="translate(60, 326)">
+
+    <!-- 01 Enunțul problemei -->
+    <text x="0" y="36" font-family="Georgia, serif" font-style="italic" font-size="38" font-weight="400" fill="#9C2A2A">01</text>
+    <line x1="60" y1="26" x2="120" y2="26" stroke="#9C2A2A" stroke-width="1.5"/>
+    <text x="0" y="62" font-family="Inter, sans-serif" font-size="11" font-weight="700" letter-spacing="2.5" fill="#9C2A2A">ENUNȚUL PROBLEMEI</text>
+
+    <text x="0" y="92" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Platformele IoT smart home generează volume mari de</tspan>
+      <tspan x="0" dy="17">telemetrie la frecvențe ridicate. Transmisă brut, această</tspan>
+      <tspan x="0" dy="17">cantitate de date saturează rapid rețeaua, broker-ul și baza</tspan>
+      <tspan x="0" dy="17">de date.</tspan>
+    </text>
+
+    <text x="0" y="184" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Sub sarcină variabilă, EMQX și consumatorii Kafka acumulează</tspan>
+      <tspan x="0" dy="17">lag și pierd mesaje, iar operatorul trebuie să retuneze manual</tspan>
+      <tspan x="0" dy="17">parametri într-un mod reactiv și predispus la erori.</tspan>
+    </text>
+
+    <text x="0" y="259" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Stocarea exhaustivă a observațiilor brute pe termen lung este</tspan>
+      <tspan x="0" dy="17">costisitoare, iar interogările analitice pe milioane de rânduri</tspan>
+      <tspan x="0" dy="17">devin lente fără agregare prealabilă.</tspan>
+    </text>
+
+    <!-- 02 Obiectiv principal -->
+    <text x="0" y="362" font-family="Georgia, serif" font-style="italic" font-size="38" font-weight="400" fill="#9C2A2A">02</text>
+    <line x1="60" y1="352" x2="120" y2="352" stroke="#9C2A2A" stroke-width="1.5"/>
+    <text x="0" y="388" font-family="Inter, sans-serif" font-size="11" font-weight="700" letter-spacing="2.5" fill="#9C2A2A">OBIECTIV PRINCIPAL</text>
+
+    <text x="0" y="418" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">O platformă IoT scalabilă care menține integritatea datelor sub</tspan>
+      <tspan x="0" dy="17">sarcină variabilă prin control adaptiv pe două niveluri: tuning</tspan>
+      <tspan x="0" dy="17">automat al pipeline-ului de ingerare și agregare multi-rezoluție</tspan>
+      <tspan x="0" dy="17">pentru interogări rapide, fără intervenție manuală a</tspan>
+      <tspan x="0" dy="17">operatorului.</tspan>
+    </text>
+
+    <!-- 03 Obiective secundare -->
+    <text x="0" y="556" font-family="Georgia, serif" font-style="italic" font-size="38" font-weight="400" fill="#9C2A2A">03</text>
+    <line x1="60" y1="546" x2="120" y2="546" stroke="#9C2A2A" stroke-width="1.5"/>
+    <text x="0" y="582" font-family="Inter, sans-serif" font-size="11" font-weight="700" letter-spacing="2.5" fill="#9C2A2A">OBIECTIVE SECUNDARE</text>
+
+    <text x="0" y="612" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Compresie la sursă prin algoritm PIP sau deadband, reducând</tspan>
+      <tspan x="0" dy="17">volumul fără a sacrifica punctele perceptual importante.</tspan>
+    </text>
+
+    <text x="0" y="670" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Controller adaptiv ce citește metrici Prometheus și ajustează</tspan>
+      <tspan x="0" dy="17">parametrii MQTT broker plus threshold-urile PIP de pe edge.</tspan>
+    </text>
+
+    <text x="0" y="728" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Lanț de continuous aggregates în TimescaleDB, de la rezoluție</tspan>
+      <tspan x="0" dy="17">orară până la lunară, pentru interogări pe ferestre lungi.</tspan>
+    </text>
+
+    <text x="0" y="786" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Tiered querying la frontiere și retenție selectivă: raw șters</tspan>
+      <tspan x="0" dy="17">periodic, agregate păstrate permanent (greedy aging).</tspan>
+    </text>
+
+    <text x="0" y="844" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Detecție de anomalii prin baseline dinamic per slot orar, cu</tspan>
+      <tspan x="0" dy="17">update declanșat de drift susținut peste un prag configurabil.</tspan>
+    </text>
+
+  </g>
+
+  <!-- ===== Vertical separators between columns ===== -->
+  <line x1="490" y1="326" x2="490" y2="910" stroke="#C9BFA8" stroke-width="0.75"/>
+  <line x1="920" y1="326" x2="920" y2="910" stroke="#C9BFA8" stroke-width="0.75"/>
+
+  <!-- =====================================================
+       COLUMN 2: Solution + Implementation
+       ===================================================== -->
+  <g transform="translate(520, 326)">
+
+    <!-- 04 Soluție propusă -->
+    <text x="0" y="36" font-family="Georgia, serif" font-style="italic" font-size="38" font-weight="400" fill="#9C2A2A">04</text>
+    <line x1="60" y1="26" x2="120" y2="26" stroke="#9C2A2A" stroke-width="1.5"/>
+    <text x="0" y="62" font-family="Inter, sans-serif" font-size="11" font-weight="700" letter-spacing="2.5" fill="#9C2A2A">SOLUȚIE PROPUSĂ</text>
+
+    <text x="0" y="92" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Arhitectură pe layere clare. Edge filtrează datele cu PIP, EMQX</tspan>
+      <tspan x="0" dy="17">rutează către Kafka, Sink Service scrie batch în TimescaleDB,</tspan>
+      <tspan x="0" dy="17">iar API și UI servesc utilizatorul.</tspan>
+    </text>
+
+    <text x="0" y="167" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Două bucle de feedback consistente ca pattern. Una ajustează</tspan>
+      <tspan x="0" dy="17">parametrii broker și threshold-urile edge pe ingerare, cealaltă</tspan>
+      <tspan x="0" dy="17">recalibrează baseline-ul în funcție de drift pe analytics.</tspan>
+    </text>
+
+    <text x="0" y="242" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Model de date SensorThings (Thing, Datastream, Observation)</tspan>
+      <tspan x="0" dy="17">stocat în hypertable TimescaleDB. Câmpul thing_id este</tspan>
+      <tspan x="0" dy="17">denormalizat în continuous aggregates pentru filtre rapide.</tspan>
+    </text>
+
+    <text x="0" y="317" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Greedy aging la nivel de stocare. Agregatele rămân permanent,</tspan>
+      <tspan x="0" dy="17">iar observațiile raw se șterg după N zile printr-o politică de</tspan>
+      <tspan x="0" dy="17">retenție automată.</tspan>
+    </text>
+
+    <!-- 05 Implementare -->
+    <text x="0" y="420" font-family="Georgia, serif" font-style="italic" font-size="38" font-weight="400" fill="#9C2A2A">05</text>
+    <line x1="60" y1="410" x2="120" y2="410" stroke="#9C2A2A" stroke-width="1.5"/>
+    <text x="0" y="446" font-family="Inter, sans-serif" font-size="11" font-weight="700" letter-spacing="2.5" fill="#9C2A2A">IMPLEMENTARE</text>
+
+    <text x="0" y="476" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0" font-weight="700" fill="#5C3A1E">Edge.</tspan>
+      <tspan dx="4">Device-uri Go cu filtru PIP (cache 100 puncte,</tspan>
+      <tspan x="0" dy="17">threshold dinamic), publicare MQTT pe topice DT și RAW.</tspan>
+    </text>
+
+    <text x="0" y="528" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0" font-weight="700" fill="#5C3A1E">Broker și streaming.</tspan>
+      <tspan dx="4">EMQX 5.x cu Kafka sink action,</tspan>
+      <tspan x="0" dy="17">Apache Kafka 3.9 pe topicul telemetry.observations.</tspan>
+    </text>
+
+    <text x="0" y="580" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0" font-weight="700" fill="#5C3A1E">Sink Service.</tspan>
+      <tspan dx="4">Consumer Kafka în Go: batch 100k rânduri</tspan>
+      <tspan x="0" dy="17">sau 1s timeout, scriere PostgreSQL COPY pe hypertable.</tspan>
+    </text>
+
+    <text x="0" y="632" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0" font-weight="700" fill="#5C3A1E">Storage.</tspan>
+      <tspan dx="4">TimescaleDB pe PostgreSQL 17, continuous</tspan>
+      <tspan x="0" dy="17">aggregates cu time_bucket() și GROUP BY pe thing_id.</tspan>
+    </text>
+
+    <text x="0" y="684" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0" font-weight="700" fill="#5C3A1E">Adaptive Controller.</tspan>
+      <tspan dx="4">Spring Boot 4, poll Prometheus</tspan>
+      <tspan x="0" dy="17">la 10s, două praguri pe metric, acțiuni HTTP plus MQTT.</tspan>
+    </text>
+
+    <text x="0" y="736" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0" font-weight="700" fill="#5C3A1E">Backend și Frontend.</tspan>
+      <tspan dx="4">Spring Boot 4 cu OAuth2 plus JWT</tspan>
+      <tspan x="0" dy="17">pentru API; Vue 3 cu Vite, Pinia și ECharts pentru dashboard.</tspan>
+    </text>
+
+    <text x="0" y="788" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0" font-weight="700" fill="#5C3A1E">Orchestrare.</tspan>
+      <tspan dx="4">Kubernetes pe minikube, ServiceMonitors</tspan>
+      <tspan x="0" dy="17">pentru Prometheus, persistent volumes pentru date.</tspan>
+    </text>
+
+  </g>
+
+  <!-- =====================================================
+       COLUMN 3: Dataset + Validation
+       ===================================================== -->
+  <g transform="translate(950, 326)">
+
+    <!-- 06 Set de date -->
+    <text x="0" y="36" font-family="Georgia, serif" font-style="italic" font-size="38" font-weight="400" fill="#9C2A2A">06</text>
+    <line x1="60" y1="26" x2="120" y2="26" stroke="#9C2A2A" stroke-width="1.5"/>
+    <text x="0" y="62" font-family="Inter, sans-serif" font-size="11" font-weight="700" letter-spacing="2.5" fill="#9C2A2A">SET DE DATE</text>
+
+    <text x="0" y="92" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0" font-weight="700" fill="#5C3A1E">Dataset real ingerat.</tspan>
+      <tspan x="0" dy="17">Nature Scientific Data, „A residential electricity consumption</tspan>
+      <tspan x="0" dy="17">dataset" (s41597-020-00712-x): date reale de consum</tspan>
+      <tspan x="0" dy="17">energetic rezidențial transmise prin pipeline cu replay</tspan>
+      <tspan x="0" dy="17">timestamping.</tspan>
+    </text>
+
+    <text x="0" y="214" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0" font-weight="700" fill="#5C3A1E">Load sintetic complementar.</tspan>
+      <tspan x="0" dy="17">Multi-simulator cu peste 20 device-uri concurente, fiecare cu</tspan>
+      <tspan x="0" dy="17">4 senzori (temperatură, umiditate, putere, lumină) la 1 Hz,</tspan>
+      <tspan x="0" dy="17">generând aproximativ 80 observații pe secundă în baseline.</tspan>
+    </text>
+
+    <text x="0" y="319" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0" font-weight="700" fill="#5C3A1E">Volum efectiv stocat.</tspan>
+      <tspan x="0" dy="17">După compresia PIP la edge, aproximativ 24 observații pe</tspan>
+      <tspan x="0" dy="17">secundă ajung în Kafka și TimescaleDB, o reducere de circa</tspan>
+      <tspan x="0" dy="17">70 la sută față de fluxul brut.</tspan>
+    </text>
+
+    <text x="0" y="424" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0" font-weight="700" fill="#5C3A1E">Schema observațiilor.</tspan>
+      <tspan x="0" dy="17">Model SensorThings cu câmpurile thing_id, datastream_id,</tspan>
+      <tspan x="0" dy="17">result_time și result_value, în hypertable cu chunk-uri zilnice.</tspan>
+    </text>
+
+    <!-- 07 Testare și validare -->
+    <text x="0" y="540" font-family="Georgia, serif" font-style="italic" font-size="38" font-weight="400" fill="#9C2A2A">07</text>
+    <line x1="60" y1="530" x2="120" y2="530" stroke="#9C2A2A" stroke-width="1.5"/>
+    <text x="0" y="566" font-family="Inter, sans-serif" font-size="11" font-weight="700" letter-spacing="2.5" fill="#9C2A2A">TESTARE ȘI VALIDARE</text>
+
+    <text x="0" y="596" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Stress test cu rampă de la 20 la peste 50 device-uri</tspan>
+      <tspan x="0" dy="17">concurente, pentru a forța bottleneck-ul EMQX și a observa</tspan>
+      <tspan x="0" dy="17">intervenția controller-ului adaptiv.</tspan>
+    </text>
+
+    <text x="0" y="671" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Metrici Prometheus monitorizate: consumer lag Kafka,</tspan>
+      <tspan x="0" dy="17">queuing depth EMQX, dropped messages și latență end-to-end</tspan>
+      <tspan x="0" dy="17">de la edge până la baza de date.</tspan>
+    </text>
+
+    <text x="0" y="746" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">Validare agregate prin comparație query-uri pe raw versus</tspan>
+      <tspan x="0" dy="17">continuous aggregate, măsurând câștigul de timp pe ferestre</tspan>
+      <tspan x="0" dy="17">lungi cu EXPLAIN ANALYZE.</tspan>
+    </text>
+
+    <text x="0" y="821" font-family="Inter, sans-serif" font-size="12.5" fill="#1A1410">
+      <tspan x="0">End to end: ingerare a unei zile din datasetul Nature și</tspan>
+      <tspan x="0" dy="17">reconstrucție a curbei zilnice în dashboard, cu detecție</tspan>
+      <tspan x="0" dy="17">corectă a drift-ului injectat în baseline.</tspan>
+    </text>
+
+  </g>
+
+  <!-- ===== Bottom rule + Architecture placeholder ===== -->
+  <line x1="60" y1="950" x2="1340" y2="950" stroke="#C9BFA8" stroke-width="0.75"/>
+
+  <g transform="translate(60, 970)">
+    <rect x="0" y="0" width="1280" height="78" fill="#E8DEC9" stroke="#9C2A2A" stroke-width="1" stroke-dasharray="6 5" rx="2"/>
+    <text x="24" y="30" font-family="Inter, sans-serif" font-size="10" font-weight="700" letter-spacing="2.5" fill="#9C2A2A">FIG. 01</text>
+    <text x="24" y="50" font-family="Georgia, serif" font-style="italic" font-size="15" fill="#1A1410">Diagramă arhitectură. Înlocuiește acest dreptunghi cu schema sistemului în Figma.</text>
+    <text x="24" y="68" font-family="Inter, sans-serif" font-size="11" fill="#5A4F40">Flux sugerat: Dataset (Nature + Simulator) → Edge (PIP) → EMQX → Kafka → Sink → TimescaleDB. Controller adaptiv în feedback peste broker și edge. Frontend Vue 3.</text>
+  </g>
+
+  <!-- ===== Footer ===== -->
+  <text x="60" y="1080" font-family="Inter, sans-serif" font-size="10" font-weight="700" letter-spacing="2.5" fill="#9C2A2A">UNIVERSITATEA TEHNICĂ DIN CLUJ-NAPOCA &#183; FACULTATEA DE AUTOMATICĂ ȘI CALCULATOARE</text>
+  <text x="1340" y="1080" text-anchor="end" font-family="Georgia, serif" font-style="italic" font-size="11" fill="#5A4F40">poster &#183; v.1</text>
+
+</svg>

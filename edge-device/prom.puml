@@ -1,0 +1,40 @@
+@startuml
+  title Monitorizare — request-uri GET și răspunsuri cu metricile reale ale sistemului
+
+  participant "Prometheus" as PROM
+  participant "kafka-exporter\n:9308" as KEXP
+  participant "postgres-exporter\n:9187" as PEXP
+  participant "EMQX\n:18083" as EMQX
+  participant "traffic-control\n:8082" as TC
+  participant "Grafana" as GRAF
+  participant "traffic-control-ui" as UI
+
+  == Colectare: Prometheus scrape (pull), la scrape_interval (configurabil) ==
+
+  PROM -> KEXP : GET /metrics
+  KEXP --> PROM : 200 OK\nkafka_consumergroup_lag\nkafka_consumergroup_lag_sum\nkafka_consumergroup_current_offset\nkafka_topic_partition_current_offset
+
+  PROM -> PEXP : GET /metrics
+  PEXP --> PROM : 200 OK\npg_database_size_bytes\npg_stat_database_tup_inserted
+
+  PROM -> EMQX : GET /api/v5/prometheus/stats
+  EMQX --> PROM : 200 OK\nemqx_connections_count\nemqx_messages_received\nemqx_actions_success\nemqx_actions_dropped\nemqx_actions_inflight
+
+  PROM -> TC : GET /actuator/prometheus
+  TC --> PROM : 200 OK\ntraffic_control_adjustment\ntraffic_control_broadcasts_total
+
+  == Reglare: traffic-control interoghează Prometheus (PromQL) ==
+
+  TC -> PROM : GET /api/v1/query?query=\nsum(kafka_consumergroup_lag{topic="telemetry.observations"})
+  PROM --> TC : 200 OK  { value: <lag> }
+
+  TC -> PROM : GET /api/v1/query?query=\nrate(emqx_actions_dropped[1m])
+  PROM --> TC : 200 OK  { value: <drop_rate> }
+
+  == Vizualizare ==
+
+  GRAF -> PROM : GET /api/v1/query_range?query=...
+  PROM --> GRAF : 200 OK  serie temporală (t, value)[]
+  UI -> GRAF : embed dashboard (iframe /grafana/...)
+  GRAF --> UI : panou randat
+@enduml

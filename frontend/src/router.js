@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth.js'
 
 const routes = [
   { path: '/', name: 'landing', component: () => import('@/pages/LandingPage.vue') },
@@ -6,6 +7,7 @@ const routes = [
   {
     path: '/',
     component: () => import('@/layouts/AppLayout.vue'),
+    meta: { requiresAuth: true },
     children: [
       { path: 'dashboard', name: 'dashboard', component: () => import('@/pages/DashboardPage.vue') },
       { path: 'explore', name: 'explore', component: () => import('@/pages/ExplorePage.vue') },
@@ -17,10 +19,21 @@ const routes = [
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
-export default createRouter({
+const router = createRouter({
   history: createWebHistory(),
   routes,
   scrollBehavior() {
     return { top: 0 }
   },
 })
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+  if (!auth.loaded) await auth.load()
+  const needsAuth = to.matched.some((r) => r.meta.requiresAuth)
+  if (needsAuth && !auth.isAuthenticated) {
+    return { name: 'login' }
+  }
+})
+
+export default router

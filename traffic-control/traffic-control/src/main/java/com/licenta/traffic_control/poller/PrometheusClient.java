@@ -24,8 +24,18 @@ public class PrometheusClient {
     }
 
     public long getConsumerLag() {
+        return queryScalar(lagQuery);
+    }
+
+    public double getEmqxDropRate() {
+        return queryDouble("rate(emqx_actions_dropped[1m])");
+    }
+
+    private long queryScalar(String query) {
         PrometheusResponse response = restClient.get()
-                .uri(uri -> uri.path("/api/v1/query").queryParam("query", lagQuery).build())
+                // Pass the query as a URI variable value so PromQL curly braces
+                // (label filters) aren't parsed as URI template placeholders.
+                .uri(uri -> uri.path("/api/v1/query").queryParam("query", "{q}").build(query))
                 .retrieve()
                 .body(PrometheusResponse.class);
 
@@ -35,10 +45,31 @@ public class PrometheusClient {
         }
         List<PrometheusResult> results = response.data() != null ? response.data().result() : null;
         if (results == null || results.isEmpty()) {
-            log.debug("No results for lag query — assuming 0 lag");
+            log.debug("No results for query '{}' — assuming 0", query);
             return 0L;
         }
         String valueStr = String.valueOf(results.getFirst().value().get(1));
         return (long) Double.parseDouble(valueStr);
+    }
+
+    private double queryDouble(String query) {
+        PrometheusResponse response = restClient.get()
+                // Pass the query as a URI variable value so PromQL curly braces
+                // (label filters) aren't parsed as URI template placeholders.
+                .uri(uri -> uri.path("/api/v1/query").queryParam("query", "{q}").build(query))
+                .retrieve()
+                .body(PrometheusResponse.class);
+
+        if (response == null || !"success".equals(response.status())) {
+            log.warn("Prometheus query returned unsuccessful response: {}", response);
+            return 0.0;
+        }
+        List<PrometheusResult> results = response.data() != null ? response.data().result() : null;
+        if (results == null || results.isEmpty()) {
+            log.debug("No results for query '{}' — assuming 0", query);
+            return 0.0;
+        }
+        String valueStr = String.valueOf(results.getFirst().value().get(1));
+        return Double.parseDouble(valueStr);
     }
 }

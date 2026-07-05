@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func New(sensorType string, interval time.Duration) (Sensor, error) {
+func New(sensorType string, interval time.Duration, datasetDir, datasetFile string) (Sensor, error) {
 	switch sensorType {
 	case "temperature":
 		return NewTemperature(interval), nil
@@ -15,6 +15,8 @@ func New(sensorType string, interval time.Duration) (Sensor, error) {
 		return NewPower(interval), nil
 	case "light":
 		return NewLight(interval), nil
+	case "ukdale":
+		return NewUKDale(interval, datasetDir, datasetFile)
 	default:
 		return nil, fmt.Errorf("unknown sensor type: %s", sensorType)
 	}

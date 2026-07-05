@@ -15,13 +15,18 @@ import (
 )
 
 type sensorEntry struct {
-	sensor       sensor.Sensor
-	filter       *pip.Filter
-	stop         chan struct{}
-	datastreamID string
-	sensorType   string
-	interval     time.Duration
-	enabled      bool
+	sensor         sensor.Sensor
+	filter         *pip.Filter
+	stop           chan struct{}
+	datastreamID   string
+	sensorType     string
+	interval       time.Duration
+	datasetDir     string
+	datasetFile    string
+	enabled        bool
+	rawActive      bool    // currently in raw/calibration mode
+	rawGen         int     // generation guard for the TTL timer
+	savedThreshold float64 // threshold to restore when raw mode ends
 }
 
 type Manager struct {
@@ -80,6 +85,8 @@ func (m *Manager) persistConfig() error {
 			Type:         entry.sensorType,
 			Interval:     entry.interval.String(),
 			Enabled:      &enabled,
+			DatasetDir:   entry.datasetDir,
+			DatasetFile:  entry.datasetFile,
 		})
 	}
 
@@ -97,20 +104,20 @@ func (m *Manager) persistConfig() error {
 	return nil
 }
 
-func (m *Manager) AddSensor(datastreamID, sensorType, intervalStr string) error {
+func (m *Manager) AddSensor(sc config.SensorConfig) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if _, exists := m.sensors[datastreamID]; exists {
-		return fmt.Errorf("sensor %s already exists", datastreamID)
+	if _, exists := m.sensors[sc.DatastreamID]; exists {
+		return fmt.Errorf("sensor %s already exists", sc.DatastreamID)
 	}
 
-	interval, err := time.ParseDuration(intervalStr)
+	interval, err := time.ParseDuration(sc.Interval)
 	if err != nil {
-		return fmt.Errorf("invalid interval %q: %w", intervalStr, err)
+		return fmt.Errorf("invalid interval %q: %w", sc.Interval, err)
 	}
 
-	s, err := sensor.New(sensorType, interval)
+	s, err := sensor.New(sc.Type, interval, sc.DatasetDir, sc.DatasetFile)
 	if err != nil {
 		return err
 	}
@@ -126,15 +133,17 @@ func (m *Manager) AddSensor(datastreamID, sensorType, intervalStr string) error 
 		sensor:       s,
 		filter:       filter,
 		stop:         make(chan struct{}),
-		datastreamID: datastreamID,
-		sensorType:   sensorType,
+		datastreamID: sc.DatastreamID,
+		sensorType:   sc.Type,
 		interval:     interval,
+		datasetDir:   sc.DatasetDir,
+		datasetFile:  sc.DatasetFile,
 		enabled:      true,
 	}
 
-	m.sensors[datastreamID] = entry
+	m.sensors[sc.DatastreamID] = entry
 	m.startSensor(entry)
-	log.Printf("[%s] sensor added (type=%s, interval=%s)", datastreamID, sensorType, intervalStr)
+	log.Printf("[%s] sensor added (type=%s, interval=%s)", sc.DatastreamID, sc.Type, sc.Interval)
 
 	if err := m.persistConfig(); err != nil {
 		log.Printf("persist error: %v", err)
@@ -215,14 +224,55 @@ func (m *Manager) DisableSensor(datastreamID string) error {
 	return nil
 }
 
+// threshold bounds: PIP threshold is kept within [minThreshold, maxThreshold].
+// minThreshold 0 = forward everything (no reduction); maxThreshold 1 = forward nothing.
+// minRiseThreshold is the lift-off base used when an increase is applied to a
+// threshold at/near 0 — the update is multiplicative, so 0 * anything stays 0.
+const (
+	minThreshold     = 0.00
+	maxThreshold     = 1.00
+	minRiseThreshold = 0.01
+)
+
+func clampThreshold(v float64) float64 {
+	if v < minThreshold {
+		return minThreshold
+	}
+	if v > maxThreshold {
+		return maxThreshold
+	}
+	return v
+}
+
+// adjustThreshold applies a percentage change to the current threshold. When
+// increasing from at/near zero, it lifts the base to minRiseThreshold first so
+// the multiplicative update can take effect (0 * anything would stay 0).
+func adjustThreshold(current, percentage float64) float64 {
+	base := current
+	if percentage > 0 && base < minRiseThreshold {
+		base = minRiseThreshold
+	}
+	return clampThreshold(base * (1 + percentage/100))
+}
+
 func (m *Manager) AdjustThreshold(datastreamID string, percentage float64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if datastreamID == "" {
 		for id, entry := range m.sensors {
+			if entry.rawActive {
+				// Calibrating: PIP is bypassed so the live threshold is
+				// irrelevant, but keep savedThreshold tracking the broadcasts
+				// peers receive so we restore to a peer-consistent value when
+				// raw mode ends.
+				old := entry.savedThreshold
+				entry.savedThreshold = adjustThreshold(old, percentage)
+				log.Printf("[%s] RAW: folded %+.0f%% into saved threshold %.4f -> %.4f", id, percentage, old, entry.savedThreshold)
+				continue
+			}
 			current := entry.filter.Threshold()
-			newVal := current * (1 + percentage/100)
+			newVal := adjustThreshold(current, percentage)
 			entry.filter.SetThreshold(newVal)
 			log.Printf("[%s] threshold adjusted %.2f -> %.2f (%+.0f%%)", id, current, newVal, percentage)
 		}
@@ -234,8 +284,13 @@ func (m *Manager) AdjustThreshold(datastreamID string, percentage float64) error
 		return fmt.Errorf("sensor %s not found", datastreamID)
 	}
 
+	if entry.rawActive {
+		log.Printf("[%s] in RAW mode, ignoring threshold adjustment", datastreamID)
+		return nil
+	}
+
 	current := entry.filter.Threshold()
-	newVal := current * (1 + percentage/100)
+	newVal := adjustThreshold(current, percentage)
 	entry.filter.SetThreshold(newVal)
 	log.Printf("[%s] threshold adjusted %.2f -> %.2f (%+.0f%%)", datastreamID, current, newVal, percentage)
 
@@ -247,12 +302,16 @@ type ConfigMessage struct {
 	DatastreamID string                `json:"datastream_id,omitempty"`
 	Type         string                `json:"type,omitempty"`
 	Interval     string                `json:"interval,omitempty"`
+	DatasetDir   string                `json:"dataset_dir,omitempty"`
+	DatasetFile  string                `json:"dataset_file,omitempty"`
 	Sensors      []config.SensorConfig `json:"sensors,omitempty"`
 }
 
 type ControlMessage struct {
 	DatastreamID string  `json:"datastream_id,omitempty"`
 	Percentage   float64 `json:"percentage"`
+	Mode         string  `json:"mode,omitempty"` // "raw" = stop thresholding for ttl_s seconds
+	TTLSeconds   int     `json:"ttl_s,omitempty"`
 }
 
 func (m *Manager) HandleConfigMessage(_ string, payload []byte) {
@@ -267,7 +326,13 @@ func (m *Manager) HandleConfigMessage(_ string, payload []byte) {
 	case "init":
 		err = m.initSensors(msg.Sensors)
 	case "add":
-		err = m.AddSensor(msg.DatastreamID, msg.Type, msg.Interval)
+		err = m.AddSensor(config.SensorConfig{
+			DatastreamID: msg.DatastreamID,
+			Type:         msg.Type,
+			Interval:     msg.Interval,
+			DatasetDir:   msg.DatasetDir,
+			DatasetFile:  msg.DatasetFile,
+		})
 	case "remove":
 		err = m.RemoveSensor(msg.DatastreamID)
 	case "enable":
@@ -302,7 +367,7 @@ func (m *Manager) initSensors(sensors []config.SensorConfig) error {
 			continue
 		}
 
-		s, err := sensor.New(sc.Type, interval)
+		s, err := sensor.New(sc.Type, interval, sc.DatasetDir, sc.DatasetFile)
 		if err != nil {
 			log.Printf("[%s] unknown type %q, skipping: %v", sc.DatastreamID, sc.Type, err)
 			continue
@@ -324,6 +389,8 @@ func (m *Manager) initSensors(sensors []config.SensorConfig) error {
 			datastreamID: sc.DatastreamID,
 			sensorType:   sc.Type,
 			interval:     interval,
+			datasetDir:   sc.DatasetDir,
+			datasetFile:  sc.DatasetFile,
 			enabled:      enabled,
 		}
 
@@ -349,16 +416,81 @@ func (m *Manager) HandleControlMessage(_ string, payload []byte) {
 		return
 	}
 
+	if msg.Mode == "raw" {
+		m.EnterRawMode(msg.DatastreamID, msg.TTLSeconds)
+		return
+	}
+
 	if err := m.AdjustThreshold(msg.DatastreamID, msg.Percentage); err != nil {
 		log.Printf("control error: %v", err)
 	}
+}
+
+// EnterRawMode disables PIP thresholding for the given datastream (or all
+// datastreams when datastreamID is empty) so it publishes every reading, then
+// auto-reverts after ttlSeconds and restores the previous threshold. The TTL is
+// self-enforced on the device, so a missed/lost "revert" command can never
+// strand a stream in raw mode. While raw, shed/relax commands are ignored.
+//
+// Safe on the broadcast topic: if this manager does not own the datastream
+// (e.g. a broadcast targeting another device in the multi-simulator), it is a
+// silent no-op.
+func (m *Manager) EnterRawMode(datastreamID string, ttlSeconds int) {
+	if ttlSeconds <= 0 {
+		log.Printf("raw mode: invalid ttl_s %d, ignoring", ttlSeconds)
+		return
+	}
+	ttl := time.Duration(ttlSeconds) * time.Second
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	arm := func(id string, entry *sensorEntry) {
+		if !entry.rawActive {
+			entry.savedThreshold = entry.filter.Threshold()
+			entry.rawActive = true
+			entry.filter.SetBypass(true)
+		}
+		entry.rawGen++
+		gen := entry.rawGen
+		time.AfterFunc(ttl, func() { m.exitRawMode(id, gen) })
+		log.Printf("[%s] RAW mode for %s (saved threshold %.4f)", id, ttl, entry.savedThreshold)
+	}
+
+	if datastreamID == "" {
+		for id, entry := range m.sensors {
+			arm(id, entry)
+		}
+		return
+	}
+	if entry, ok := m.sensors[datastreamID]; ok {
+		arm(datastreamID, entry)
+	}
+	// otherwise: not this device's datastream — ignore silently.
+}
+
+// exitRawMode is fired by a stream's TTL timer. It only reverts if this is still
+// the most recent raw window for the stream (rawGen guard), so a stale timer
+// from a superseded window can't cut a newer one short.
+func (m *Manager) exitRawMode(datastreamID string, gen int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	entry, ok := m.sensors[datastreamID]
+	if !ok || !entry.rawActive || entry.rawGen != gen {
+		return
+	}
+	entry.filter.SetBypass(false)
+	entry.filter.SetThreshold(entry.savedThreshold)
+	entry.rawActive = false
+	log.Printf("[%s] RAW mode ended, threshold restored to %.4f", datastreamID, entry.savedThreshold)
 }
 
 func (m *Manager) WaitForInit(timeout time.Duration) bool {
 	configTopic := fmt.Sprintf("cmd/config/%s", m.thingID)
 	initCh := make(chan []byte, 1)
 
-	if err := m.client.Subscribe(configTopic, func(_ string, payload []byte) {
+	if err := m.client.Subscribe(configTopic, 2, func(_ string, payload []byte) {
 		var msg ConfigMessage
 		if err := json.Unmarshal(payload, &msg); err != nil {
 			return

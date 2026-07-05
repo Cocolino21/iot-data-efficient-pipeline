@@ -51,19 +51,14 @@ async function deleteDevice() {
           v-for="d in devices.list"
           :key="d.id"
           class="card"
-          :class="{ offline: d.status !== 'online' }"
           @click="openDevice(d)"
         >
           <div class="bar"></div>
           <div class="head">
             <div class="name">{{ d.name }}</div>
-            <span class="badge" :class="d.status === 'online' ? 'badge-online' : 'badge-offline'">
-              <span class="status-dot" :style="{ background: d.status === 'online' ? 'var(--green)' : 'var(--red)' }"></span>
-              {{ d.status === 'online' ? 'Online' : 'Offline' }}
-            </span>
           </div>
-          <div class="row"><span class="k">Last seen:</span><span class="v">{{ relTime(d.last_seen_at) }}</span></div>
-          <div class="row"><span class="k">Location:</span><span class="v">{{ d.latitude.toFixed(4) }}, {{ d.longitude.toFixed(4) }}</span></div>
+          <div class="row"><span class="k">Last seen:</span><span class="v">{{ d.last_seen_at ? relTime(d.last_seen_at) : 'never' }}</span></div>
+          <div class="row"><span class="k">Location:</span><span class="v">{{ d.latitude != null ? d.latitude.toFixed(4) : '—' }}, {{ d.longitude != null ? d.longitude.toFixed(4) : '—' }}</span></div>
           <div class="row"><span class="k">Sensors:</span><span class="v">{{ activeCount(d) }} active / {{ d.sensors.length }} total</span></div>
 
           <div class="footer">

@@ -1,185 +1,130 @@
-// Mock API layer. Every page goes through this file so swapping to a real
-// backend is a one-file change: replace each function body with fetch() calls.
+// Talks to the core-service Spring Boot backend over fetch with the JWT cookie
+// (HttpOnly `auth`). FE never sees the token; it just sends credentials.
 //
-// Real backend would expose:
-//   GET  /api/devices                              -> Device[]
-//   POST /api/devices                              -> Device
-//   GET  /api/devices/:id                          -> Device with sensors
-//   POST /api/devices/:id/sensors                  -> Sensor
-//   PATCH /api/datastreams/:id  { is_active }      -> Datastream
+// Endpoints (see core-service):
+//   GET    /api/auth/me
+//   POST   /api/auth/logout
+//   GET    /oauth2/authorization/google                      (browser redirect)
+//   GET    /api/devices                                       -> Device[]
+//   POST   /api/devices                                       -> Device
+//   GET    /api/devices/:id                                   -> Device with sensors
+//   DELETE /api/devices/:id
+//   POST   /api/devices/:id/sensors                           -> Sensor
+//   PATCH  /api/datastreams/:id  { is_active }
 //   DELETE /api/sensors/:id
-//   GET  /api/datastreams/:id/observations?from&to -> Observation[]
-// And a websocket /api/stream that pushes Observations as they arrive.
+//   GET    /api/datastreams/:id/observations?from&to&maxPoints
 
-import { generateSeries, latestValue, quality } from './mockGenerator.js'
+import { quality } from './mockGenerator.js'
 
-const SEED_DEVICES = [
-  {
-    id: 'dev-living-room',
-    name: 'Living Room Hub',
-    description: 'Main hub in the living room, central monitoring point',
-    latitude: 44.4268,
-    longitude: 26.1025,
-    status: 'online',
-    last_seen_at: () => Date.now() - 1500,
-    sensors: [
-      { id: 'sn-temp-1', name: 'Temperature Sensor', type: 'temperature', observed: 'Temperature', unit: 'C', symbol: 'C', is_active: true },
-      { id: 'sn-hum-1',  name: 'Humidity Sensor',    type: 'humidity',    observed: 'Relative Humidity', unit: '%RH', symbol: '%RH', is_active: true },
-      { id: 'sn-co2-1',  name: 'CO2 Sensor',         type: 'co2',         observed: 'Carbon Dioxide', unit: 'ppm', symbol: 'ppm', is_active: true },
-      { id: 'sn-lux-1',  name: 'Light Sensor',       type: 'light',       observed: 'Luminous Intensity', unit: 'lux', symbol: 'lux', is_active: true },
-      { id: 'sn-pwr-1',  name: 'Power Meter',        type: 'energy',      observed: 'Power Consumption', unit: 'kWh', symbol: 'kWh', is_active: true },
-      { id: 'sn-prs-1',  name: 'Barometric Sensor',  type: 'pressure',    observed: 'Atmospheric Pressure', unit: 'hPa', symbol: 'hPa', is_active: false },
-    ],
-  },
-  {
-    id: 'dev-bedroom',
-    name: 'Bedroom Station',
-    description: 'Secondary station in the master bedroom',
-    latitude: 44.4268,
-    longitude: 26.1025,
-    status: 'online',
-    last_seen_at: () => Date.now() - 120_000,
-    sensors: [
-      { id: 'sn-temp-2', name: 'Temperature Sensor', type: 'temperature', observed: 'Temperature', unit: 'C', symbol: 'C', is_active: true },
-      { id: 'sn-hum-2',  name: 'Humidity Sensor',    type: 'humidity',    observed: 'Relative Humidity', unit: '%RH', symbol: '%RH', is_active: true },
-      { id: 'sn-lux-2',  name: 'Light Sensor',       type: 'light',       observed: 'Luminous Intensity', unit: 'lux', symbol: 'lux', is_active: true },
-    ],
-  },
-  {
-    id: 'dev-garden',
-    name: 'Garden Monitor',
-    description: 'Outdoor monitoring node',
-    latitude: 44.4270,
-    longitude: 26.1030,
-    status: 'offline',
-    last_seen_at: () => Date.now() - 3 * 3600_000,
-    sensors: [
-      { id: 'sn-temp-3', name: 'Temperature Sensor', type: 'temperature', observed: 'Temperature', unit: 'C', symbol: 'C', is_active: false },
-      { id: 'sn-hum-3',  name: 'Humidity Sensor',    type: 'humidity',    observed: 'Relative Humidity', unit: '%RH', symbol: '%RH', is_active: false },
-      { id: 'sn-lux-3',  name: 'Light Sensor',       type: 'light',       observed: 'Luminous Intensity', unit: 'lux', symbol: 'lux', is_active: false },
-      { id: 'sn-prs-3',  name: 'Pressure Sensor',    type: 'pressure',    observed: 'Atmospheric Pressure', unit: 'hPa', symbol: 'hPa', is_active: false },
-    ],
-  },
-  {
-    id: 'dev-kitchen',
-    name: 'Kitchen Sensors',
-    description: 'Kitchen monitoring node',
-    latitude: 44.4268,
-    longitude: 26.1025,
-    status: 'online',
-    last_seen_at: () => Date.now() - 800,
-    sensors: [
-      { id: 'sn-temp-4', name: 'Temperature Sensor', type: 'temperature', observed: 'Temperature', unit: 'C', symbol: 'C', is_active: true },
-      { id: 'sn-hum-4',  name: 'Humidity Sensor',    type: 'humidity',    observed: 'Relative Humidity', unit: '%RH', symbol: '%RH', is_active: true },
-      { id: 'sn-co2-4',  name: 'CO2 Sensor',         type: 'co2',         observed: 'Carbon Dioxide', unit: 'ppm', symbol: 'ppm', is_active: true },
-      { id: 'sn-pwr-4',  name: 'Power Meter',        type: 'energy',      observed: 'Power Consumption', unit: 'kWh', symbol: 'kWh', is_active: true },
-    ],
-  },
-]
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8083').replace(/\/+$/, '')
+// traffic-control runs as a separate service (control-loop settings live here).
+const TC_API_BASE = (import.meta.env.VITE_TC_API_URL || 'http://localhost:8082').replace(/\/+$/, '')
 
-// Frozen, in-memory mutable copy.
-function deepClone(o) { return JSON.parse(JSON.stringify(o)) }
-const DEVICES = SEED_DEVICES.map((d) => ({ ...d, last_seen_at: d.last_seen_at() }))
-
-const delay = (ms = 80) => new Promise((r) => setTimeout(r, ms))
+async function request(path, { method = 'GET', body, query, base = API_BASE } = {}) {
+  let url = `${base}${path}`
+  if (query) {
+    const qs = new URLSearchParams(
+      Object.entries(query).filter(([, v]) => v !== undefined && v !== null),
+    ).toString()
+    if (qs) url += `?${qs}`
+  }
+  const res = await fetch(url, {
+    method,
+    credentials: 'include',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (res.status === 204) return null
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status} ${res.statusText}`)
+    err.status = res.status
+    try { err.body = await res.json() } catch { /* noop */ }
+    throw err
+  }
+  return res.json()
+}
 
 export const api = {
-  async listDevices() {
-    await delay()
-    return DEVICES.map((d) => ({ ...deepClone(d), last_seen_at: d.status === 'online' ? Date.now() - Math.floor(Math.random() * 5000) : d.last_seen_at }))
+  // --- auth ---
+  loginUrl() {
+    return `${API_BASE}/oauth2/authorization/google`
   },
-
-  async getDevice(id) {
-    await delay()
-    const d = DEVICES.find((x) => x.id === id)
-    return d ? { ...deepClone(d), last_seen_at: d.status === 'online' ? Date.now() - Math.floor(Math.random() * 5000) : d.last_seen_at } : null
-  },
-
-  async createDevice(payload) {
-    await delay()
-    const d = {
-      id: 'dev-' + Math.random().toString(36).slice(2, 8),
-      name: payload.name || 'New Device',
-      description: payload.description || '',
-      latitude: Number(payload.latitude) || 0,
-      longitude: Number(payload.longitude) || 0,
-      status: 'online',
-      last_seen_at: Date.now(),
-      sensors: [],
+  async me() {
+    try {
+      return await request('/api/auth/me')
+    } catch (e) {
+      if (e.status === 401) return null
+      throw e
     }
-    DEVICES.push(d)
-    return deepClone(d)
+  },
+  logout() {
+    return request('/api/auth/logout', { method: 'POST' })
   },
 
-  async deleteDevice(id) {
-    await delay()
-    const i = DEVICES.findIndex((d) => d.id === id)
-    if (i >= 0) DEVICES.splice(i, 1)
+  // --- devices ---
+  listDevices() {
+    return request('/api/devices')
+  },
+  getDevice(id) {
+    return request(`/api/devices/${id}`)
+  },
+  createDevice(payload) {
+    return request('/api/devices', { method: 'POST', body: payload })
+  },
+  deleteDevice(id) {
+    return request(`/api/devices/${id}`, { method: 'DELETE' })
   },
 
-  async addSensor(deviceId, payload) {
-    await delay()
-    const d = DEVICES.find((x) => x.id === deviceId)
-    if (!d) return null
-    const sensor = {
-      id: 'sn-' + Math.random().toString(36).slice(2, 8),
-      name: payload.name,
-      type: payload.type,
-      observed: payload.observed,
-      unit: payload.unit,
-      symbol: payload.symbol || payload.unit,
-      is_active: true,
-    }
-    d.sensors.push(sensor)
-    return deepClone(sensor)
+  // --- sensors / datastreams ---
+  addSensor(deviceId, payload) {
+    return request(`/api/devices/${deviceId}/sensors`, { method: 'POST', body: payload })
+  },
+  toggleSensor(_deviceId, sensorId, is_active) {
+    return request(`/api/datastreams/${sensorId}`, { method: 'PATCH', body: { is_active } })
+  },
+  deleteSensor(_deviceId, sensorId) {
+    return request(`/api/sensors/${sensorId}`, { method: 'DELETE' })
   },
 
-  async toggleSensor(deviceId, sensorId, is_active) {
-    await delay()
-    const d = DEVICES.find((x) => x.id === deviceId)
-    if (!d) return
-    const s = d.sensors.find((x) => x.id === sensorId)
-    if (s) s.is_active = is_active
-  },
-
-  async deleteSensor(deviceId, sensorId) {
-    await delay()
-    const d = DEVICES.find((x) => x.id === deviceId)
-    if (!d) return
-    d.sensors = d.sensors.filter((s) => s.id !== sensorId)
-  },
-
-  async observations(datastreamId, type, fromMs, toMs, maxPoints = 200) {
-    await delay()
-    return generateSeries(datastreamId, type, fromMs, toMs, maxPoints)
-  },
-
-  latest(datastreamId, type) {
-    return { timestamp: Date.now(), value: latestValue(datastreamId, type) }
+  // --- observations ---
+  observations(datastreamId, _type, fromMs, toMs, maxPoints = 200) {
+    return request(`/api/datastreams/${datastreamId}/observations`, {
+      query: { from: Math.floor(fromMs), to: Math.floor(toMs), maxPoints },
+    })
   },
 
   qualityFor: quality,
 
-  // Real backend would replace this with a websocket subscription.
-  // The shape here is identical to what the real stream would push.
-  subscribeLive(callback, intervalMs = 2000) {
-    const id = setInterval(() => {
-      const samples = []
-      for (const d of DEVICES) {
-        if (d.status !== 'online') continue
-        for (const s of d.sensors) {
-          if (!s.is_active) continue
-          samples.push({
-            device_id: d.id,
-            datastream_id: s.id,
-            type: s.type,
-            timestamp: Date.now(),
-            value: latestValue(s.id, s.type),
-          })
-        }
-      }
-      callback(samples)
-    }, intervalMs)
-    return () => clearInterval(id)
+  // Live stream is not implemented on the backend yet. Polling + manual
+  // refresh covers the FE today; return a no-op unsubscribe so the store
+  // contract stays the same.
+  subscribeLive() {
+    return () => {}
+  },
+}
+
+// traffic-control (control loop) settings. Separate origin from core-service.
+function tcRequest(path, opts = {}) {
+  return request(path, { ...opts, base: TC_API_BASE })
+}
+
+export const tcApi = {
+  getController() {
+    return tcRequest('/api/controller')
+  },
+  putController(body) {
+    return tcRequest('/api/controller', { method: 'PUT', body })
+  },
+  getPid() {
+    return tcRequest('/api/pid')
+  },
+  putPid(body) {
+    return tcRequest('/api/pid', { method: 'PUT', body })
+  },
+  getHysteresis() {
+    return tcRequest('/api/hysteresis')
+  },
+  putHysteresis(body) {
+    return tcRequest('/api/hysteresis', { method: 'PUT', body })
   },
 }

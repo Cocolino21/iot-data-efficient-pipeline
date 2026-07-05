@@ -67,6 +67,7 @@ func main() {
 	var messageBatch []kafka.Message
 	var payloadBatch []Observation
 	var batchStart time.Time
+	const maxFlushRetries = 3
 
 	// Helper function to flush the buffer to the DB and commit to Kafka
 	flush := func() {
@@ -74,38 +75,62 @@ func main() {
 			return
 		}
 
-		// 1. Begin PostgreSQL Transaction
-		txn, err := db.Begin()
-		if err != nil {
-			log.Fatalf("Failed to begin transaction: %v", err)
-		}
+		for attempt := 1; attempt <= maxFlushRetries; attempt++ {
+			err := func() error {
+				txn, err := db.Begin()
+				if err != nil {
+					return err
+				}
+				defer txn.Rollback()
 
-		// 2. Prepare the blazing fast COPY statement
-		stmt, err := txn.Prepare(pq.CopyIn("observation", "timestamp", "datastream_id", "value"))
-		if err != nil {
-			log.Fatalf("Failed to prepare COPY statement: %v", err)
-		}
+				// Auto-register ALL datastream IDs in this batch to handle races
+				idSet := make(map[string]struct{})
+				for _, p := range payloadBatch {
+					idSet[p.DatastreamID] = struct{}{}
+				}
+				allIDs := make([]string, 0, len(idSet))
+				for id := range idSet {
+					allIDs = append(allIDs, id)
+				}
+				if _, err := txn.Exec("SELECT ensure_datastreams($1)", pq.Array(allIDs)); err != nil {
+					return err
+				}
 
-		// 3. Load all buffered data into the statement
-		for _, p := range payloadBatch {
-			_, err = stmt.Exec(p.Timestamp, p.DatastreamID, p.Value)
-			if err != nil {
-				log.Fatalf("Failed to execute COPY row: %v", err)
+				stmt, err := txn.Prepare(pq.CopyIn("observation", "timestamp", "datastream_id", "value"))
+				if err != nil {
+					return err
+				}
+
+				for _, p := range payloadBatch {
+					if _, err = stmt.Exec(p.Timestamp, p.DatastreamID, p.Value); err != nil {
+						stmt.Close()
+						return err
+					}
+				}
+
+				if _, err = stmt.Exec(); err != nil {
+					stmt.Close()
+					return err
+				}
+				if err = stmt.Close(); err != nil {
+					return err
+				}
+				return txn.Commit()
+			}()
+
+			if err == nil {
+				break
 			}
+
+			if attempt < maxFlushRetries {
+				log.Printf("Flush attempt %d/%d failed: %v — retrying", attempt, maxFlushRetries, err)
+				time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
+				continue
+			}
+			log.Fatalf("Flush failed after %d attempts: %v", maxFlushRetries, err)
 		}
 
-		// 4. Execute and close the statement, then commit the transaction
-		if _, err = stmt.Exec(); err != nil {
-			log.Fatalf("Failed to flush COPY statement: %v", err)
-		}
-		if err = stmt.Close(); err != nil {
-			log.Fatalf("Failed to close COPY statement: %v", err)
-		}
-		if err = txn.Commit(); err != nil {
-			log.Fatalf("Transaction commit failed: %v", err)
-		}
-
-		// 5. Commit Kafka Offsets ONLY after DB succeeds
+		// Commit Kafka Offsets ONLY after DB succeeds
 		if err := r.CommitMessages(context.Background(), messageBatch...); err != nil {
 			log.Fatalf("Failed to commit Kafka messages: %v", err)
 		}

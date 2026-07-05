@@ -1,0 +1,42 @@
+ @startuml
+  interface LagController {
+    + mode() : ControllerMode
+    + compute(currentLag : long) : double
+    + reset()
+  }
+
+  enum ControllerMode {
+    NONE
+    PID
+    HYSTERESIS
+  }
+
+  class HysteresisController {
+    - settings : HysteresisSettings
+    + compute(currentLag : long) : double
+  }
+
+  class PidController {
+    - settings : PidSettings
+    - integral : double
+    - previousError : double
+    - lastTimeNanos : long
+    + compute(currentLag : long) : double
+    + reset()
+  }
+
+  class ControllerRegistry {
+    - byMode : Map<ControllerMode, LagController>
+    - settings : ControllerSettings
+    + active() : LagController
+  }
+
+  LagController <|.. HysteresisController
+  LagController <|.. PidController
+  LagController --> ControllerMode
+  ControllerRegistry o--> "*" LagController : byMode
+  ControllerRegistry ..> ControllerSettings : getMode()
+  HysteresisController ..> HysteresisSettings
+  PidController ..> PidSettings
+
+  @enduml

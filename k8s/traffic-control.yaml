@@ -24,6 +24,12 @@ spec:
               value: http://prometheus:9090
             - name: CONTROLLER_MQTT_BROKER
               value: tcp://host.minikube.internal:1883
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://host.minikube.internal:5433/iot
+            - name: SPRING_DATASOURCE_USERNAME
+              value: postgres
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: postgres
 ---
 apiVersion: v1
 kind: Service

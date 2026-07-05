@@ -39,14 +39,19 @@ function relTime(ts) {
 function lastValue(s) {
   if (!s.is_active) return '---'
   const lv = devices.liveValues[s.id]
-  const v = lv ? lv.value : api.latest(s.id, s.type).value
-  return v
+  if (lv) return lv.value
+  const series = sparklines.value[s.id]
+  if (series && series.length) return series[series.length - 1].value
+  return '---'
 }
 
 function lastSeen(s) {
   if (!s.is_active) return 'Inactive'
   const lv = devices.liveValues[s.id]
-  return relTime(lv?.timestamp || Date.now())
+  if (lv) return relTime(lv.timestamp)
+  const series = sparklines.value[s.id]
+  if (series && series.length) return relTime(series[series.length - 1].timestamp)
+  return '---'
 }
 
 async function toggle(s) {
@@ -90,9 +95,9 @@ function exploreSensor(s) {
         </span>
 
         <div class="meta-row">
-          <div><span class="k">Last seen:</span><span class="v">{{ relTime(device.last_seen_at) }}</span></div>
+          <div><span class="k">Last seen:</span><span class="v">{{ device.last_seen_at ? relTime(device.last_seen_at) : 'never' }}</span></div>
           <div><span class="k">Description:</span><span class="v">{{ device.description }}</span></div>
-          <div><span class="k">Location:</span><span class="v">{{ device.latitude.toFixed(4) }}, {{ device.longitude.toFixed(4) }}</span></div>
+          <div><span class="k">Location:</span><span class="v">{{ device.latitude != null ? device.latitude.toFixed(4) : '—' }}, {{ device.longitude != null ? device.longitude.toFixed(4) : '—' }}</span></div>
         </div>
       </div>
 

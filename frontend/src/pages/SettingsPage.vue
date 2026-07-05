@@ -1,20 +1,94 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import TopBar from '@/components/TopBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useDashboardStore } from '@/stores/dashboard.js'
+import { useAuthStore } from '@/stores/auth.js'
+import { tcApi } from '@/services/api.js'
 
 const dashboard = useDashboardStore()
+const auth = useAuthStore()
 const router = useRouter()
 const showResetConfirm = ref(false)
+const signingOut = ref(false)
+
+// ── Traffic control (control loop) ─────────────────────────
+const tcMode = ref('PID')         // committed mode from the backend
+const pid = ref(null)             // PidSettings
+const hyst = ref(null)            // HysteresisSettings
+const tcLoaded = ref(false)
+const tcError = ref('')
+const tcSaving = ref(false)
+const tcStatus = ref('')
+
+async function loadTrafficControl() {
+  tcError.value = ''
+  try {
+    const [ctrl, pidSettings, hystSettings] = await Promise.all([
+      tcApi.getController(),
+      tcApi.getPid(),
+      tcApi.getHysteresis(),
+    ])
+    tcMode.value = ctrl.mode
+    pid.value = pidSettings
+    hyst.value = hystSettings
+    tcLoaded.value = true
+  } catch (e) {
+    tcError.value = `Could not reach traffic-control: ${e.message}`
+  }
+}
+
+async function saveMode() {
+  await runTc(() => tcApi.putController({ mode: tcMode.value }), 'Mode updated')
+}
+async function savePid() {
+  await runTc(() => tcApi.putPid(pid.value), 'PID settings saved')
+}
+async function saveHysteresis() {
+  await runTc(() => tcApi.putHysteresis(hyst.value), 'Hysteresis settings saved')
+}
+
+async function runTc(fn, okMsg) {
+  if (tcSaving.value) return
+  tcSaving.value = true
+  tcStatus.value = ''
+  tcError.value = ''
+  try {
+    await fn()
+    tcStatus.value = okMsg
+  } catch (e) {
+    tcError.value = e.message
+  } finally {
+    tcSaving.value = false
+  }
+}
+
+onMounted(loadTrafficControl)
+
+const initials = computed(() => {
+  const name = auth.user?.name || auth.user?.email || ''
+  return name
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || '')
+    .join('') || '?'
+})
 
 function resetLayout() {
   dashboard.reset()
   showResetConfirm.value = false
 }
-function signOut() {
-  router.push('/')
+async function signOut() {
+  if (signingOut.value) return
+  signingOut.value = true
+  try {
+    await auth.logout()
+  } finally {
+    signingOut.value = false
+    router.push('/login')
+  }
 }
 </script>
 
@@ -29,12 +103,12 @@ function signOut() {
         <p class="muted">Your account information from OAuth provider (read-only)</p>
 
         <div class="profile">
-          <div class="avatar-lg">MB</div>
+          <div class="avatar-lg">{{ initials }}</div>
           <div class="info-grid">
-            <div><span class="k">Name</span><span class="v">Mihnea Bostina</span></div>
-            <div><span class="k">Email</span><span class="v">mihnea@example.com</span></div>
+            <div><span class="k">Name</span><span class="v">{{ auth.user?.name || '—' }}</span></div>
+            <div><span class="k">Email</span><span class="v">{{ auth.user?.email || '—' }}</span></div>
             <div><span class="k">OAuth Provider</span><span class="v provider">Google</span></div>
-            <div><span class="k">Member since</span><span class="v">March 2026</span></div>
+            <div><span class="k">User ID</span><span class="v">{{ auth.user?.id || '—' }}</span></div>
           </div>
         </div>
       </section>
@@ -54,6 +128,57 @@ function signOut() {
           </div>
           <button class="btn btn-danger" @click="showResetConfirm = true">Reset to Default</button>
         </div>
+      </section>
+
+      <!-- Traffic control -->
+      <section class="panel">
+        <h3>Traffic Control</h3>
+        <p class="muted">Choose the control strategy that adjusts the PIP threshold across devices, and tune its parameters.</p>
+
+        <p v-if="tcError" class="tc-error">{{ tcError }}</p>
+        <p v-else-if="!tcLoaded" class="muted">Loading…</p>
+
+        <template v-if="tcLoaded">
+          <div class="setting">
+            <div>
+              <div class="setting-title">Active mode</div>
+              <div class="setting-desc">Only one controller runs at a time. "None" disables broadcasting.</div>
+            </div>
+            <div class="row">
+              <select v-model="tcMode">
+                <option value="NONE">None</option>
+                <option value="PID">PID</option>
+                <option value="HYSTERESIS">Hysteresis</option>
+              </select>
+              <button class="btn btn-secondary" :disabled="tcSaving" @click="saveMode">Apply</button>
+            </div>
+          </div>
+
+          <!-- PID params -->
+          <div v-if="tcMode === 'PID' && pid" class="params">
+            <div class="field"><label>Target lag</label><input type="number" v-model.number="pid.targetLag" /></div>
+            <div class="field"><label>Kp</label><input type="number" step="any" v-model.number="pid.kp" /></div>
+            <div class="field"><label>Ki</label><input type="number" step="any" v-model.number="pid.ki" /></div>
+            <div class="field"><label>Kd</label><input type="number" step="any" v-model.number="pid.kd" /></div>
+            <div class="field"><label>Integral max</label><input type="number" step="any" v-model.number="pid.integralMax" /></div>
+            <div class="field"><label>Output min</label><input type="number" step="any" v-model.number="pid.outputMin" /></div>
+            <div class="field"><label>Output max</label><input type="number" step="any" v-model.number="pid.outputMax" /></div>
+            <div class="actions"><button class="btn btn-secondary" :disabled="tcSaving" @click="savePid">Save PID</button></div>
+          </div>
+
+          <!-- Hysteresis params -->
+          <div v-if="tcMode === 'HYSTERESIS' && hyst" class="params">
+            <div class="field"><label>Upper lag</label><input type="number" v-model.number="hyst.upperLag" /></div>
+            <div class="field"><label>Lower lag</label><input type="number" v-model.number="hyst.lowerLag" /></div>
+            <div class="field"><label>Step (%)</label><input type="number" step="any" v-model.number="hyst.step" /></div>
+            <div class="field"><label>Gain</label><input type="number" step="any" v-model.number="hyst.gain" /></div>
+            <div class="field"><label>Output min</label><input type="number" step="any" v-model.number="hyst.outputMin" /></div>
+            <div class="field"><label>Output max</label><input type="number" step="any" v-model.number="hyst.outputMax" /></div>
+            <div class="actions"><button class="btn btn-secondary" :disabled="tcSaving" @click="saveHysteresis">Save Hysteresis</button></div>
+          </div>
+
+          <p v-if="tcStatus" class="tc-status">{{ tcStatus }}</p>
+        </template>
       </section>
 
       <!-- Appearance (future) -->
@@ -79,7 +204,9 @@ function signOut() {
             <div class="setting-title">Sign Out</div>
             <div class="setting-desc">End your current session and return to the landing page.</div>
           </div>
-          <button class="btn btn-secondary" @click="signOut">Sign Out</button>
+          <button class="btn btn-secondary" :disabled="signingOut" @click="signOut">
+            {{ signingOut ? 'Signing out…' : 'Sign Out' }}
+          </button>
         </div>
       </section>
     </div>
@@ -142,4 +269,21 @@ function signOut() {
   padding: 2px 10px; border-radius: 10px;
   margin-left: 8px; vertical-align: middle;
 }
+
+.row { display: flex; align-items: center; gap: 10px; }
+.params {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px;
+  margin-top: 18px; padding-top: 18px;
+  border-top: 1px solid var(--border, rgba(255,255,255,0.08));
+}
+.params .field { display: flex; flex-direction: column; gap: 6px; }
+.params .field label { color: var(--text-faint); font-size: 12px; font-weight: 500; }
+.params .field input {
+  background: var(--bg-elevated); color: var(--text-primary);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 6px; padding: 7px 10px; font-size: 13px;
+}
+.params .actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
+.tc-error { color: var(--danger, #f87171); font-size: 12px; margin: 4px 0 0; }
+.tc-status { color: var(--text-secondary); font-size: 12px; margin: 14px 0 0; }
 </style>

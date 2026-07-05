@@ -1,0 +1,74 @@
+Variables : 
+
+Edge devices : 
+
+- PIP Algorithm window size
+- PIP Algorithm sampling threshold (automatically tweaked)
+- No. of edge devices
+- No. of datastream per edge device
+
+Queue level : 
+
+- kafka_partition
+- max_linger_time (automatically tweaked)
+- max_linger_bytes (automatically tweaked)
+- max_batch_bytes (automatically tweaked)
+- max_inflight (automatically tweaked)
+
+Database insert : 
+
+- maxBatchAge 
+- sink service horizontal scaling (automatically tweaked, capped at kafka_partition number)
+
+Database : 
+
+ - retention policy
+ - delta treshold 
+ - delta_batch cron
+ - baseline-drift-check
+ - baseline granularity
+
+(Recap and detailed documentation of every service/process/interaction - more in depth understanding - also where papers apply)
+
+Edge Level : 
+ - recap of structure
+ - PIP Algorithm recap
+ - MQTT Messages Structure 
+ - make it take data from dataset
+ - fix threshold < 1 and > 0.01 limits
+ - how multi-simulator works (with components from edge app)
+ - cache window size testing and ram testing ( for rasp pi ) 
+
+- How the PID Controller works 
+- Baseline adjustments and testing
+- Find and fix existing bugs (testing the app itself)
+- Define clearly the tests and parameters
+- Start the tests
+
+
+
+
+
+Found issues : 
+
+- threshold to return to might not be the threshold currently on the rest of the devices  ( some type of control over unique devices threshold needed)
+- we might need to apply QoS 2
+
+
+Tests: 
+
+- Data reconstruction test 
+-> measure error when comparing to real unsampled dataset
+VARYING:
+ - treshold
+ - window size
+
+- Measure latency from edge devices to Database 
+VARYING: 
+- number of datastreams (sensors) and devices
+- with and without KEDA activated
+- track for both
+
+- Measure query performance with raw observations vs with continous aggregates
+
+

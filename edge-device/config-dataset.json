@@ -1,0 +1,27 @@
+{
+  "device": {
+    "thing_id": "device-dataset",
+    "mqtt": {
+      "dt_broker": "tcp://localhost:1883",
+      "raw_broker": "tcp://localhost:1884",
+      "publish_raw": true
+    },
+    "simulated": true,
+    "sensors": [
+      {
+        "datastream_id": "mains",
+        "type": "ukdale",
+        "interval": "1s",
+        "dataset_dir": "../data/ukdale/house_1",
+        "enabled": true
+      }
+    ]
+  },
+  "control": {
+    "pip": {
+      "cache_size": 100,
+      "threshold": 0.8,
+      "max_interval": "30s"
+    }
+  }
+}

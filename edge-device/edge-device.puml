@@ -1,0 +1,242 @@
+@startuml
+namespace config {
+    class "Config" << (S,Aquamarine) >> {
+        + Device DeviceConfig
+        + Control ControlConfig
+
+    }
+    class "ControlConfig" << (S,Aquamarine) >> {
+        + PIP PIPConfig
+
+    }
+    class "DeviceConfig" << (S,Aquamarine) >> {
+        + ThingID string
+        + MQTT MQTTConfig
+        + Simulated bool
+        + Sensors []SensorConfig
+
+    }
+    class "MQTTConfig" << (S,Aquamarine) >> {
+        + Broker string
+        + DTBroker string
+        + RawBroker string
+        + PublishRaw bool
+
+        + DTBrokerAddr() string
+
+    }
+    class "PIPConfig" << (S,Aquamarine) >> {
+        + CacheSize int
+        + Threshold float64
+        + MaxInterval string
+
+    }
+    class "SensorConfig" << (S,Aquamarine) >> {
+        + DatastreamID string
+        + Type string
+        + Interval string
+        + Enabled *bool
+        + DatasetDir string
+        + DatasetFile string
+
+    }
+}
+namespace device {
+    class "ConfigMessage" << (S,Aquamarine) >> {
+        + Action string
+        + DatastreamID string
+        + Type string
+        + Interval string
+        + DatasetDir string
+        + DatasetFile string
+        + Sensors []config.SensorConfig
+
+    }
+    class "ControlMessage" << (S,Aquamarine) >> {
+        + DatastreamID string
+        + Percentage float64
+        + Mode string
+        + TTLSeconds int
+
+    }
+    class "DeviceStatus" << (S,Aquamarine) >> {
+        + ThingID string
+        + Sensors []SensorStatus
+
+    }
+    class "Manager" << (S,Aquamarine) >> {
+        - mu sync.Mutex
+        - sensors <font color=blue>map</font>[string]*sensorEntry
+        - client *mqtt.Client
+        - rawClient *mqtt.Client
+        - thingID string
+        - pipCfg config.PIPConfig
+        - simulated bool
+        - configPath string
+        - cfg *config.Config
+        - wg sync.WaitGroup
+
+        - startSensor(entry *sensorEntry) 
+        - persistConfig() error
+        - initSensors(sensors []config.SensorConfig) error
+        - exitRawMode(datastreamID string, gen int) 
+
+        + AddSensor(sc config.SensorConfig) error
+        + RemoveSensor(datastreamID string) error
+        + EnableSensor(datastreamID string) error
+        + DisableSensor(datastreamID string) error
+        + AdjustThreshold(datastreamID string, percentage float64) error
+        + HandleConfigMessage(_ string, payload []byte) 
+        + HandleControlMessage(_ string, payload []byte) 
+        + EnterRawMode(datastreamID string, ttlSeconds int) 
+        + WaitForInit(timeout time.Duration) bool
+        + Stop() 
+        + Status() DeviceStatus
+
+    }
+    class "SensorStatus" << (S,Aquamarine) >> {
+        + DatastreamID string
+        + Type string
+        + Interval string
+        + Enabled bool
+        + Threshold float64
+
+    }
+    class "sensorEntry" << (S,Aquamarine) >> {
+        - sensor sensor.Sensor
+        - filter *pip.Filter
+        - stop <font color=blue>chan</font> <font color=blue>struct</font>{}
+        - datastreamID string
+        - sensorType string
+        - interval time.Duration
+        - datasetDir string
+        - datasetFile string
+        - enabled bool
+        - rawActive bool
+        - rawGen int
+        - savedThreshold float64
+
+    }
+}
+
+namespace mqtt {
+    class "Client" << (S,Aquamarine) >> {
+        - client paho.mqtt.golang.Client
+
+        + Publish(prefix string, thingID string, datastreamID string, timestamp time.Time, value float64) error
+        + Subscribe(topic string, qos byte, handler <font color=blue>func</font>(string, []byte) ) error
+        + Close() 
+
+    }
+    class "payload" << (S,Aquamarine) >> {
+        + Timestamp string
+        + Value float64
+
+    }
+}
+namespace pip {
+    class "Filter" << (S,Aquamarine) >> {
+        - cache []Point
+        - cacheSize int
+        - threshold float64
+        - maxInterval time.Duration
+        - bypass bool
+        - mu sync.Mutex
+
+        + Threshold() float64
+        + SetThreshold(t float64) 
+        + SetBypass(b bool) 
+        + Process(timestamp time.Time, value float64) bool
+
+    }
+    class "Point" << (S,Aquamarine) >> {
+        + Time float64
+        + Value float64
+
+    }
+}
+namespace sensor {
+    class "Humidity" << (S,Aquamarine) >> {
+        - interval time.Duration
+        - value float64
+        - lastTempBase float64
+
+        + ReadValue() Reading
+
+    }
+    class "Light" << (S,Aquamarine) >> {
+        - interval time.Duration
+        - value float64
+
+        - isSleeping(now time.Time) bool
+
+        + ReadValue() Reading
+
+    }
+    class "Power" << (S,Aquamarine) >> {
+        - interval time.Duration
+        - appliances []appliance
+        - baseLoad float64
+
+        - isSleeping(now time.Time) bool
+
+        + ReadValue() Reading
+
+    }
+    class "Reading" << (S,Aquamarine) >> {
+        + Timestamp time.Time
+        + Value float64
+
+    }
+    interface "Sensor"  {
+        + ReadValue() Reading
+
+    }
+    class "Temperature" << (S,Aquamarine) >> {
+        - interval time.Duration
+        - hvac float64
+
+        + ReadValue() Reading
+
+    }
+    class "UKDale" << (S,Aquamarine) >> {
+        - interval time.Duration
+        - path string
+        - file *os.File
+        - scanner *bufio.Scanner
+
+        + ReadValue() Reading
+
+    }
+    class "appliance" << (S,Aquamarine) >> {
+        - name string
+        - watts float64
+        - pOn float64
+        - pOff float64
+        - state bool
+
+    }
+}
+
+"sensor.Sensor" <|-- "sensor.Humidity"
+"sensor.Sensor" <|-- "sensor.Light"
+"sensor.Sensor" <|-- "sensor.Power"
+"sensor.Sensor" <|-- "sensor.Temperature"
+"sensor.Sensor" <|-- "sensor.UKDale"
+
+"config.Config" o-- "config.ControlConfig"
+"config.Config" o-- "config.DeviceConfig"
+"config.ControlConfig" o-- "config.PIPConfig"
+"config.DeviceConfig" o-- "config.MQTTConfig"
+"config.DeviceConfig" o-- "config.SensorConfig"
+"device.ConfigMessage" o-- "config.SensorConfig"
+"device.DeviceStatus" o-- "device.SensorStatus"
+"sensor.Reading" o-- "time.Time"
+
+"device.Manager" o-- "device.sensorEntry"
+"device.Manager" o-- "mqtt.Client"
+"device.sensorEntry" o-- "pip.Filter"
+"device.sensorEntry" ..> "sensor.Sensor"
+
+
+@enduml

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useDevicesStore } from '@/stores/devices.js'
+import { useTimeStore } from '@/stores/time.js'
 import { api } from '@/services/api.js'
 import { colorForType } from './useChartTheme.js'
 
@@ -9,21 +10,27 @@ const props = defineProps({
 })
 
 const devices = useDevicesStore()
+const time = useTimeStore()
 const sensors = computed(() => props.datastreamIds.map((id) => devices.allSensors.find((s) => s.id === id)).filter(Boolean))
 
 const current = ref({})  // sensorId -> current value
 const previous = ref({}) // sensorId -> previous value
 
-const liveValues = computed(() => devices.liveValues)
-
-watch([sensors, liveValues], () => {
+async function loadLatest() {
   for (const s of sensors.value) {
-    const lv = devices.liveValues[s.id]
-    const next = lv ? lv.value : api.latest(s.id, s.type).value
-    previous.value[s.id] = current.value[s.id] ?? next
-    current.value[s.id] = next
+    try {
+      const obs = await api.observations(s.id, s.type, Date.now() - 60 * 60_000, Date.now(), 1)
+      const last = obs[obs.length - 1]
+      const next = last ? last.value : 0
+      previous.value[s.id] = current.value[s.id] ?? next
+      current.value[s.id] = next
+    } catch {
+      current.value[s.id] = current.value[s.id] ?? 0
+    }
   }
-}, { immediate: true, deep: true })
+}
+
+watch(() => [props.datastreamIds.join(','), time.refreshTick, devices.list.length], loadLatest, { immediate: true })
 
 function format(s, v) {
   const decimals = (s.type === 'co2' || s.type === 'light') ? 0 : 1

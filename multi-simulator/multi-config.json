@@ -1,5 +1,5 @@
 {
-  "device_count": 5000,
+  "device_count": 500 ,
   "device_prefix": "device",
   "mqtt_broker": "tcp://localhost:1883",
   "raw_broker": "tcp://localhost:1884",
@@ -29,7 +29,7 @@
   ],
   "pip": {
     "cache_size": 100,
-    "threshold": 0.3,
+    "threshold": 0.1,
     "max_interval": "30s"
   }
 }

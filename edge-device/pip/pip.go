@@ -16,6 +16,7 @@ type Filter struct {
 	cacheSize   int
 	threshold   float64
 	maxInterval time.Duration
+	bypass      bool
 	mu          sync.Mutex
 }
 
@@ -37,6 +38,14 @@ func (f *Filter) Threshold() float64 {
 func (f *Filter) SetThreshold(t float64) {
 	f.mu.Lock()
 	f.threshold = t
+	f.mu.Unlock()
+}
+
+// SetBypass toggles raw mode. While bypassed, Process forwards every reading
+// (no PIP thresholding).
+func (f *Filter) SetBypass(b bool) {
+	f.mu.Lock()
+	f.bypass = b
 	f.mu.Unlock()
 }
 
@@ -84,6 +93,13 @@ func pipOrdering(points []Point) []int {
 }
 
 func (f *Filter) Process(timestamp time.Time, value float64) bool {
+	f.mu.Lock()
+	bypass := f.bypass
+	f.mu.Unlock()
+	if bypass {
+		return true // raw mode: forward everything
+	}
+
 	point := Point{
 		Time:  float64(timestamp.UnixMilli()) / 1000.0,
 		Value: value,

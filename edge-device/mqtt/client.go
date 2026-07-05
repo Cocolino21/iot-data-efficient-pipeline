@@ -48,8 +48,8 @@ func (c *Client) Publish(prefix string, thingID string, datastreamID string, tim
 	return token.Error()
 }
 
-func (c *Client) Subscribe(topic string, handler func(topic string, payload []byte)) error {
-	token := c.client.Subscribe(topic, 0, func(_ pahomqtt.Client, msg pahomqtt.Message) {
+func (c *Client) Subscribe(topic string, qos byte, handler func(topic string, payload []byte)) error {
+	token := c.client.Subscribe(topic, qos, func(_ pahomqtt.Client, msg pahomqtt.Message) {
 		handler(msg.Topic(), msg.Payload())
 	})
 	token.Wait()
