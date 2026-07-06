@@ -20,11 +20,16 @@ public class HysteresisController implements LagController {
     public double compute(long currentLag) {
         double output;
         if (currentLag > settings.getUpperLag()) {
-            double overshoot = currentLag - settings.getUpperLag();
+            // Shed scales with severity: relative overshoot past the edge, so
+            // the same gain works for any band placement (lag at 2x the edge
+            // adds `gain` percent on top of the base step).
+            double upper = Math.max(1, settings.getUpperLag());
+            double overshoot = (currentLag - upper) / upper;
             output = settings.getStep() + settings.getGain() * overshoot;
         } else if (currentLag < settings.getLowerLag()) {
-            double overshoot = settings.getLowerLag() - currentLag;
-            output = -(settings.getStep() + settings.getGain() * overshoot);
+            // Relax is a flat gentle decay: the actuator is cumulative, so an
+            // overshoot-scaled relax would flood traffic back and limit-cycle.
+            output = -settings.getRelaxStep();
         } else {
             return 0;
         }

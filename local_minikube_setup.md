@@ -16,7 +16,7 @@ minikube start --cpus=4 --memory=6g
 & minikube docker-env --shell powershell | Invoke-Expression
 docker build -t sink-service:dev    sink-service/
 docker build -t traffic-control:dev traffic-control/traffic-control/
-docker build -t core-service:dev    core-service/
+# optional : docker build -t core-service:dev    core-service/
 
 # 4. Create the core-service Secret (Google OIDC client + JWT signing key)
 #    See "core-service secrets" below for where the values come from.
@@ -27,6 +27,14 @@ kubectl create secret generic core-service-secrets -n iot `
 
 # 5. Apply all manifests
 kubectl apply -f k8s/
+
+# KEDA is required for the ScaledObject below (one-time per cluster)
+helm repo add kedacore https://kedacore.github.io/charts
+helm repo update
+kubectl create namespace keda
+helm install keda kedacore/keda --namespace keda
+kubectl wait --for=condition=available --timeout=120s deployment/keda-operator -n keda
+
 kubectl apply -f infrastructure/sink-service-scaler.yaml
 
 # 6. Verify

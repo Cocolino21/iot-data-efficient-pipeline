@@ -24,6 +24,13 @@ data:
           - targets: ["host.minikube.internal:18083"]
         metrics_path: /api/v5/prometheus/stats
 
+      # Rule-engine / Kafka bridge action metrics (emqx_action_*, emqx_rule_*)
+      # live on a separate endpoint than the broker stats above.
+      - job_name: "emqx-data-integration"
+        static_configs:
+          - targets: ["host.minikube.internal:18083"]
+        metrics_path: /api/v5/prometheus/data_integration
+
       - job_name: "traffic-control"
         scrape_interval: 1s
         scrape_timeout: 1s

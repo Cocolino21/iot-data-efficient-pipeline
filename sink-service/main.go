@@ -20,6 +20,20 @@ type Observation struct {
 	DatastreamID string    `json:"datastream_id"`
 	Timestamp    time.Time `json:"timestamp"`
 	Value        float64   `json:"value"`
+	Type         string    `json:"type"`
+}
+
+// normalizeType maps device sensor types onto the registry's
+// datastream.observation_type vocabulary. Unknown types return "" (left NULL).
+func normalizeType(t string) string {
+	switch t {
+	case "power", "ukdale", "energy":
+		return "energy"
+	case "temperature", "humidity", "light":
+		return t
+	default:
+		return ""
+	}
 }
 
 func main() {
@@ -84,9 +98,10 @@ func main() {
 				defer txn.Rollback()
 
 				// Auto-register ALL datastream IDs in this batch to handle races
-				idSet := make(map[string]struct{})
+				type dsMeta struct{ thing, sensorType string }
+				idSet := make(map[string]dsMeta)
 				for _, p := range payloadBatch {
-					idSet[p.DatastreamID] = struct{}{}
+					idSet[p.DatastreamID] = dsMeta{thing: p.ThingID, sensorType: p.Type}
 				}
 				allIDs := make([]string, 0, len(idSet))
 				for id := range idSet {
@@ -94,6 +109,51 @@ func main() {
 				}
 				if _, err := txn.Exec("SELECT ensure_datastreams($1)", pq.Array(allIDs)); err != nil {
 					return err
+				}
+
+				// Fill observation_type for auto-registered rows from the
+				// device-declared sensor type (registry-created rows already
+				// have it; the IS NULL guard leaves them untouched).
+				typeIDs := make([]string, 0, len(idSet))
+				typeVals := make([]string, 0, len(idSet))
+				for id, meta := range idSet {
+					if t := normalizeType(meta.sensorType); t != "" {
+						typeIDs = append(typeIDs, id)
+						typeVals = append(typeVals, t)
+					}
+				}
+				if len(typeIDs) > 0 {
+					if _, err := txn.Exec(
+						`UPDATE datastream d SET observation_type = v.otype
+						 FROM (SELECT unnest($1::text[]) AS id, unnest($2::text[]) AS otype) v
+						 WHERE d.datastream_id = v.id AND d.observation_type IS NULL`,
+						pq.Array(typeIDs), pq.Array(typeVals)); err != nil {
+						return err
+					}
+				}
+
+				// Record each datastream's external thing id (from the MQTT topic,
+				// via EMQX) so the calibration orchestrator can address the device
+				// on cmd/control/<thing_id>. The registry's UUID thing_id doesn't
+				// match the device's MQTT subscription; live telemetry is the
+				// source of truth, so overwrite unconditionally.
+				dsIDs := make([]string, 0, len(idSet))
+				thingIDs := make([]string, 0, len(idSet))
+				for ds, meta := range idSet {
+					if meta.thing == "" {
+						continue
+					}
+					dsIDs = append(dsIDs, ds)
+					thingIDs = append(thingIDs, meta.thing)
+				}
+				if len(dsIDs) > 0 {
+					if _, err := txn.Exec(
+						`INSERT INTO calibration_state (datastream_id, thing_id)
+						 SELECT unnest($1::text[]), unnest($2::text[])
+						 ON CONFLICT (datastream_id) DO UPDATE SET thing_id = EXCLUDED.thing_id`,
+						pq.Array(dsIDs), pq.Array(thingIDs)); err != nil {
+						return err
+					}
 				}
 
 				stmt, err := txn.Prepare(pq.CopyIn("observation", "timestamp", "datastream_id", "value"))

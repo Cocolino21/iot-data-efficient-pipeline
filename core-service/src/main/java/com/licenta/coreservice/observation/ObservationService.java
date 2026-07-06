@@ -27,6 +27,6 @@ public class ObservationService {
 
         String externalId = refs.externalId();
         if (externalId == null || externalId.isBlank()) return List.of();
-        return observationRepo.downsample(externalId, fromMs, toMs, Math.max(1, maxPoints));
+        return observationRepo.readAdaptive(externalId, fromMs, toMs, Math.max(1, maxPoints));
     }
 }

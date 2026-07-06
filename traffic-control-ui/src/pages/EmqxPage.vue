@@ -43,16 +43,18 @@ function toggleEnabled() {
         <span class="state-label">Last Drop Rate</span>
         <span class="state-value">{{ emqxState.lastDropRate?.toFixed(2) ?? '—' }}/s</span>
       </div>
+      <div class="state-item">
+        <span class="state-label">Auto-Tuning</span>
+        <button class="switch" :class="{ on: form.enabled }" role="switch"
+                :aria-checked="!!form.enabled" @click="toggleEnabled">
+          <span class="switch-knob" />
+        </button>
+        <span class="state-value">{{ form.enabled ? 'On' : 'Off' }}</span>
+      </div>
     </div>
 
     <div class="grid">
       <SettingsCard title="Thresholds">
-        <template #actions>
-          <button class="btn" :class="form.enabled ? 'btn-primary' : 'btn-ghost'" @click="toggleEnabled">
-            {{ form.enabled ? '● Enabled' : '○ Disabled' }}
-          </button>
-        </template>
-
         <div class="field-grid">
           <label class="field">
             <span class="field-label">Drop Rate Threshold</span>
@@ -161,6 +163,35 @@ function toggleEnabled() {
   font-size: 14px;
   color: var(--text-secondary);
   font-weight: 600;
+}
+.switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.15s, background 0.15s;
+}
+.switch.on {
+  background: var(--green);
+  border-color: var(--green);
+}
+.switch.on .switch-knob {
+  transform: translateX(18px);
+  background: white;
 }
 .grid {
   display: grid;

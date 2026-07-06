@@ -498,7 +498,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(emqx_actions_success[1m])",
+          "expr": "rate(emqx_action_success[1m])",
           "legendFormat": "Success",
           "refId": "A"
         },
@@ -507,12 +507,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(emqx_actions_dropped[1m])",
+          "expr": "rate(emqx_action_dropped[1m])",
           "legendFormat": "Dropped",
           "refId": "B"
         }
       ],
-      "title": "EMQX ??? Kafka Bridge Throughput",
+      "title": "EMQX to Kafka Bridge Throughput",
       "type": "timeseries"
     },
     {
@@ -713,7 +713,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(emqx_actions_dropped[1m])",
+          "expr": "rate(emqx_action_dropped[1m])",
           "legendFormat": "Drops/s",
           "refId": "A"
         },
@@ -722,7 +722,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "emqx_actions_inflight",
+          "expr": "emqx_action_inflight",
           "legendFormat": "In-flight",
           "refId": "B"
         }
@@ -936,11 +936,11 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Each bar is a discrete broadcast event: the PIP adjustment percentage at the moments it was actually sent to devices (i.e. cleared the dead zone). Gaps mean no message was sent — the controller was inside the dead zone or disabled. Driven by increase() of a counter so it shows events, not a held last value.",
+      "description": "Each point is one broadcast actually sent to devices (it cleared the dead zone). Orange above zero = shedding (threshold raised, traffic cut); green below zero = relaxing (threshold lowered, traffic allowed back). Empty stretches mean the controller was holding — inside the dead zone or disabled.",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
           "custom": {
             "axisBorderShow": false,
@@ -950,7 +950,7 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "bars",
+            "drawStyle": "points",
             "fillOpacity": 70,
             "gradientMode": "none",
             "hideFrom": {
@@ -959,12 +959,12 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineWidth": 1,
-            "pointSize": 6,
+            "lineWidth": 0,
+            "pointSize": 9,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "always",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -980,6 +980,10 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0
               }
             ]
           },
@@ -1016,12 +1020,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "traffic_control_adjustment and (increase(traffic_control_broadcasts_total[3s]) > 0)",
+          "expr": "traffic_control_adjustment and (increase(traffic_control_broadcasts_total[2s]) > 0)",
           "legendFormat": "Adjustment sent %",
           "refId": "A"
         }
       ],
-      "title": "Threshold adjustments sent",
+      "title": "PIP adjustments broadcast (%)",
       "type": "timeseries"
     }
   ],

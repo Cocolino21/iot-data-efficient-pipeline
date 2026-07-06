@@ -27,12 +27,16 @@ public class PidController implements LagController {
         double dt = lastTimeNanos == 0 ? 0 : (now - lastTimeNanos) / 1_000_000_000.0;
         lastTimeNanos = now;
 
+        // Relative error: lag at 2x target -> 1.0, lag at 0 -> -1.0. Keeps gains
+        // independent of the target's magnitude and maps Kp directly to "% output
+        // per 100% deviation". Guard keeps the division sane if targetLag is 0.
+        double target = Math.max(1, settings.getTargetLag());
+        double error = (currentLag - target) / target;
+
         if (dt <= 0) {
-            previousError = currentLag - settings.getTargetLag();
+            previousError = error;
             return 0;
         }
-
-        double error = currentLag - settings.getTargetLag();
 
         // Integral with windup protection
         integral += error * dt;
@@ -46,9 +50,9 @@ public class PidController implements LagController {
         double clamped = Math.max(settings.getOutputMin(), Math.min(settings.getOutputMax(), output));
 
         log.debug("PID: error={}, integral={}, derivative={}, output={}, clamped={}",
-                String.format("%.1f", error),
-                String.format("%.1f", integral),
-                String.format("%.1f", derivative),
+                String.format("%.3f", error),
+                String.format("%.3f", integral),
+                String.format("%.3f", derivative),
                 String.format("%.2f", output),
                 String.format("%.2f", clamped));
 

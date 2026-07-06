@@ -94,6 +94,7 @@ public class SettingsController {
         hysteresisSettings.setLowerLag(update.getLowerLag());
         hysteresisSettings.setStep(update.getStep());
         hysteresisSettings.setGain(update.getGain());
+        hysteresisSettings.setRelaxStep(update.getRelaxStep());
         hysteresisSettings.setOutputMin(update.getOutputMin());
         hysteresisSettings.setOutputMax(update.getOutputMax());
         return hysteresisSettings;
@@ -112,17 +113,36 @@ public class SettingsController {
         if (update.getCollectionTtlSeconds() > 0) calibrationSettings.setCollectionTtlSeconds(update.getCollectionTtlSeconds());
         if (update.getBaselineDays() > 0) calibrationSettings.setBaselineDays(update.getBaselineDays());
         if (update.getPollIntervalMs() > 0) calibrationSettings.setPollIntervalMs(update.getPollIntervalMs());
+        if (update.getDriftThreshold() > 0) calibrationSettings.setDriftThreshold(update.getDriftThreshold());
+        if (update.getMinHours() > 0) calibrationSettings.setMinHours(update.getMinHours());
         return calibrationSettings;
     }
 
+    @PostMapping("/calibration/trigger")
+    public Map<String, String> triggerCalibration(@RequestParam String datastreamId) {
+        return Map.of("result", calibrationOrchestrator.triggerNow(datastreamId));
+    }
+
     @GetMapping("/calibration/state")
-    public List<Map<String, Object>> getCalibrationState() {
-        return jdbc.queryForList("""
+    public Map<String, Object> getCalibrationState(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "") String q) {
+        int safeSize = Math.min(Math.max(size, 1), 200);
+        int safePage = Math.max(page, 0);
+        String like = "%" + q.trim() + "%";
+        List<Map<String, Object>> items = jdbc.queryForList("""
                 SELECT datastream_id, thing_id, status, needs_calibration,
                        drift_score, flagged_at, lease_started_at, lease_expires_at, last_collected_at
                 FROM calibration_state
-                ORDER BY drift_score DESC
-                """);
+                WHERE datastream_id ILIKE ? OR thing_id ILIKE ?
+                ORDER BY drift_score DESC, datastream_id
+                LIMIT ? OFFSET ?
+                """, like, like, safeSize, safePage * safeSize);
+        long total = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM calibration_state WHERE datastream_id ILIKE ? OR thing_id ILIKE ?",
+                Long.class, like, like);
+        return Map.of("items", items, "total", total, "page", safePage, "size", safeSize);
     }
 
     // ── EMQX Tuning ───────────────────────────────────────

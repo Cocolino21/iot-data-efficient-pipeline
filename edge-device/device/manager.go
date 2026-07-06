@@ -55,14 +55,14 @@ func (m *Manager) startSensor(entry *sensorEntry) {
 				reading := entry.sensor.ReadValue()
 
 				if m.rawClient != nil {
-					if err := m.rawClient.Publish("raw", m.thingID, entry.datastreamID, reading.Timestamp, reading.Value); err != nil {
+					if err := m.rawClient.Publish("raw", m.thingID, entry.datastreamID, entry.sensorType, reading.Timestamp, reading.Value); err != nil {
 						log.Printf("[%s] raw publish error: %v", entry.datastreamID, err)
 					}
 				}
 
 				forward := entry.filter.Process(reading.Timestamp, reading.Value)
 				if forward {
-					if err := m.client.Publish("dt", m.thingID, entry.datastreamID, reading.Timestamp, reading.Value); err != nil {
+					if err := m.client.Publish("dt", m.thingID, entry.datastreamID, entry.sensorType, reading.Timestamp, reading.Value); err != nil {
 						log.Printf("[%s] dt publish error: %v", entry.datastreamID, err)
 					}
 				}

@@ -1,11 +1,17 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTrafficControlStore } from '@/stores/trafficControl.js'
 import SettingsCard from '@/components/SettingsCard.vue'
 
 const store = useTrafficControlStore()
-const { calibrationSettings, calibrationState, loading } = storeToRefs(store)
+const { calibrationSettings, calibrationState, calibrationQuery, loading } = storeToRefs(store)
+
+let searchTimer = null
+watch(calibrationQuery, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => store.refreshCalibrationState(0), 300)
+})
 
 const form = ref({})
 const saved = ref(false)
@@ -28,6 +34,13 @@ function statusClass(status) {
   if (status === 'collecting') return 'badge-warning'
   if (status === 'idle') return 'badge-online'
   return 'badge-offline'
+}
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(calibrationState.value.total / calibrationState.value.size)))
+
+function goToPage(page) {
+  store.refreshCalibrationState(Math.min(Math.max(page, 0), totalPages.value - 1))
 }
 </script>
 
@@ -55,6 +68,14 @@ function statusClass(status) {
             <span class="field-label">Poll Interval (ms)</span>
             <input type="number" v-model.number="form.pollIntervalMs" />
           </label>
+          <label class="field">
+            <span class="field-label">Drift Threshold (relative)</span>
+            <input type="number" step="0.01" v-model.number="form.driftThreshold" />
+          </label>
+          <label class="field">
+            <span class="field-label">Min Hours</span>
+            <input type="number" v-model.number="form.minHours" />
+          </label>
         </div>
 
         <div class="actions">
@@ -67,11 +88,13 @@ function statusClass(status) {
 
       <SettingsCard title="Calibration State">
         <template #actions>
+          <input v-model="calibrationQuery" class="search" type="search"
+                 placeholder="Search stream / device…" />
           <button class="btn btn-ghost" @click="store.refreshCalibrationState()">↻ Refresh</button>
         </template>
 
         <div class="table-wrap">
-          <table v-if="calibrationState.length">
+          <table v-if="calibrationState.items.length">
             <thead>
               <tr>
                 <th>Datastream</th>
@@ -82,7 +105,7 @@ function statusClass(status) {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in calibrationState" :key="row.datastream_id">
+              <tr v-for="row in calibrationState.items" :key="row.datastream_id">
                 <td class="mono">{{ row.datastream_id }}</td>
                 <td class="mono">{{ row.thing_id ?? '—' }}</td>
                 <td><span class="badge" :class="statusClass(row.status)">{{ row.status }}</span></td>
@@ -92,6 +115,15 @@ function statusClass(status) {
             </tbody>
           </table>
           <p v-else class="empty">No calibration entries yet</p>
+        </div>
+
+        <div class="pager" v-if="calibrationState.total > calibrationState.size">
+          <button class="btn btn-ghost" :disabled="calibrationState.page === 0"
+                  @click="goToPage(calibrationState.page - 1)">‹ Prev</button>
+          <span class="pager-info">Page {{ calibrationState.page + 1 }} of {{ totalPages }}
+            <span class="pager-total">({{ calibrationState.total }} streams)</span></span>
+          <button class="btn btn-ghost" :disabled="calibrationState.page >= totalPages - 1"
+                  @click="goToPage(calibrationState.page + 1)">Next ›</button>
         </div>
       </SettingsCard>
     </div>
@@ -175,4 +207,29 @@ td {
   padding: 32px;
   color: var(--text-faint);
 }
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+.pager-info {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.pager-total {
+  color: var(--text-faint);
+}
+.search {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  width: 190px;
+}
+.search::placeholder { color: var(--text-faint); }
 </style>

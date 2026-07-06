@@ -15,6 +15,7 @@ type Client struct {
 type payload struct {
 	Timestamp string  `json:"timestamp"`
 	Value     float64 `json:"value"`
+	Type      string  `json:"type,omitempty"`
 }
 
 func NewClient(broker string, clientID string) (*Client, error) {
@@ -32,12 +33,13 @@ func NewClient(broker string, clientID string) (*Client, error) {
 	return &Client{client: client}, nil
 }
 
-func (c *Client) Publish(prefix string, thingID string, datastreamID string, timestamp time.Time, value float64) error {
+func (c *Client) Publish(prefix string, thingID string, datastreamID string, sensorType string, timestamp time.Time, value float64) error {
 	topic := fmt.Sprintf("%s/%s/%s", prefix, thingID, datastreamID)
 
 	data, err := json.Marshal(payload{
 		Timestamp: timestamp.UTC().Format(time.RFC3339),
 		Value:     value,
+		Type:      sensorType,
 	})
 	if err != nil {
 		return fmt.Errorf("marshaling payload: %w", err)

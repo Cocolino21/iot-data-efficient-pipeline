@@ -115,29 +115,36 @@ async function savePollInterval() {
         <p class="poll-hint">How often the live loop reads lag and (re)broadcasts. Applies instantly.</p>
       </SettingsCard>
 
-      <SettingsCard title="Consumer Lag (live)">
+      <SettingsCard title="PIP adjustments (live)">
         <GrafanaEmbed
-          src="/d-solo/traffic-control/traffic-control-dashboard?orgId=1&panelId=10&kiosk"
+          src="/d-solo/traffic-control/traffic-control-dashboard?orgId=1&panelId=11&kiosk"
           height="280px"
-          refresh="1s"
-          from="now-2m"
+          refresh="5s"
+          from="now-15m"
         />
       </SettingsCard>
     </div>
 
-    <SettingsCard title="Threshold adjustments sent (live)" class="params-card">
-      <p class="mode-help">
-        Each bar marks a moment a threshold-adjustment message was actually broadcast to devices,
-        at the percentage sent. Gaps mean nothing was sent — the controller stayed inside the dead
-        zone or is disabled.
-      </p>
-      <GrafanaEmbed
-        src="/d-solo/traffic-control/traffic-control-dashboard?orgId=1&panelId=11&kiosk"
-        height="280px"
-        refresh="5s"
-        from="now-15m"
-      />
-    </SettingsCard>
+    <div class="charts-grid params-card">
+      <SettingsCard title="Consumer Lag Trend (live)">
+        <GrafanaEmbed
+          src="/d-solo/traffic-control/traffic-control-dashboard?orgId=1&panelId=10&kiosk"
+          height="280px"
+          refresh="1s"
+          from="now-15m"
+        />
+      </SettingsCard>
+
+      <SettingsCard title="EMQX Messages Received (live)"
+                    subtitle="Falls when shedding, recovers when relaxed">
+        <GrafanaEmbed
+          src="/d-solo/traffic-control/traffic-control-dashboard?orgId=1&panelId=4&kiosk"
+          height="280px"
+          refresh="5s"
+          from="now-15m"
+        />
+      </SettingsCard>
+    </div>
 
     <!-- PID parameters -->
     <SettingsCard v-if="viewedMode === 'PID'" title="PID Parameters" class="params-card">
@@ -210,12 +217,16 @@ async function savePollInterval() {
           <input type="number" v-model.number="hystForm.lowerLag" />
         </label>
         <label class="field">
-          <span class="field-label">Step (%)</span>
+          <span class="field-label">Shed Step (%)</span>
           <input type="number" step="0.1" v-model.number="hystForm.step" />
         </label>
         <label class="field">
-          <span class="field-label">Gain</span>
-          <input type="number" step="0.0001" v-model.number="hystForm.gain" />
+          <span class="field-label">Gain (% / 100% overshoot)</span>
+          <input type="number" step="0.1" v-model.number="hystForm.gain" />
+        </label>
+        <label class="field">
+          <span class="field-label">Relax Step (%)</span>
+          <input type="number" step="0.1" v-model.number="hystForm.relaxStep" />
         </label>
         <label class="field">
           <span class="field-label">Output Min (%)</span>
@@ -272,6 +283,12 @@ async function savePollInterval() {
   gap: 20px;
 }
 .params-card { margin-top: 20px; }
+/* Consumer Lag is the dominant chart; EMQX messages sits narrower beside it. */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
 
 /* Mode selector */
 .mode-help {

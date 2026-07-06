@@ -13,6 +13,7 @@ const routes = [
       { path: 'control',     name: 'control',     component: () => import('@/pages/ControlPage.vue') },
       { path: 'emqx',        name: 'emqx',        component: () => import('@/pages/EmqxPage.vue') },
       { path: 'calibration', name: 'calibration', component: () => import('@/pages/CalibrationPage.vue') },
+      { path: 'datastreams', name: 'datastreams', component: () => import('@/pages/DatastreamsPage.vue') },
     ],
   },
 ]

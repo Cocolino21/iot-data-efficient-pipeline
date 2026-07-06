@@ -42,7 +42,20 @@ export const api = {
   // Calibration
   getCalibrationSettings() { return request('/api/calibration/settings') },
   updateCalibrationSettings(data) { return request('/api/calibration/settings', { method: 'PUT', body: data }) },
-  getCalibrationState() { return request('/api/calibration/state') },
+  getCalibrationState(page = 0, size = 20, q = '') { return request(`/api/calibration/state?page=${page}&size=${size}&q=${encodeURIComponent(q)}`) },
+  triggerCalibration(datastreamId) { return request(`/api/calibration/trigger?datastreamId=${encodeURIComponent(datastreamId)}`, { method: 'POST' }) },
+
+  // Datastream inspector
+  getDatastreams(page = 0, size = 20, q = '') { return request(`/api/datastreams?page=${page}&size=${size}&q=${encodeURIComponent(q)}`) },
+  getBaseline(datastreamId) { return request(`/api/datastreams/${encodeURIComponent(datastreamId)}/baseline`) },
+  getRaw(datastreamId, minutes = 15) { return request(`/api/datastreams/${encodeURIComponent(datastreamId)}/raw?minutes=${minutes}`) },
+  getReconstructed(datastreamId, minutes = 15) { return request(`/api/datastreams/${encodeURIComponent(datastreamId)}/reconstructed?minutes=${minutes}`) },
+  getAggregates(datastreamId, tier, fromMs, toMs) {
+    return request(`/api/datastreams/${encodeURIComponent(datastreamId)}/aggregates?tier=${tier}&from=${Math.floor(fromMs)}&to=${Math.floor(toMs)}`)
+  },
+
+  // Fixed build/config facts (queries, smoothing windows)
+  getMeta()           { return request('/api/meta') },
 
   // Test
   publishPip(pct)     { return request(`/api/test/pip?pct=${pct}`, { method: 'POST' }) },

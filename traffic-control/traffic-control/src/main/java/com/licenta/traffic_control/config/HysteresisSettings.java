@@ -16,10 +16,17 @@ public class HysteresisSettings {
     private long upperLag;
     /** Lag below this edge triggers a negative (relax) adjustment. */
     private long lowerLag;
-    /** Fixed percentage applied each tick while out of band. */
+    /** Fixed shed percentage applied each tick while above the upper edge. */
     private double step;
-    /** Proportional kick per unit of overshoot past the crossed edge. */
+    /** Extra shed percentage per 100% relative overshoot past the upper edge. */
     private double gain;
+    /**
+     * Flat relax percentage applied each tick while below the lower edge.
+     * Deliberately small relative to {@code step}: the actuator is cumulative,
+     * so a gentle constant decay lets traffic return without re-overshooting
+     * the upper edge (shed fast, relax slow).
+     */
+    private double relaxStep;
     /** Lower clamp on the emitted percentage. */
     private double outputMin;
     /** Upper clamp on the emitted percentage. */

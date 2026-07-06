@@ -15,12 +15,15 @@ public class PrometheusClient {
 
     private final RestClient restClient;
     private final String lagQuery;
+    private final String emqxDropQuery;
 
     public PrometheusClient(
             @Value("${controller.prometheus.url}") String baseUrl,
-            @Value("${controller.prometheus.lag-query}") String lagQuery) {
+            @Value("${controller.prometheus.lag-query}") String lagQuery,
+            @Value("${controller.prometheus.emqx-drop-query}") String emqxDropQuery) {
         this.restClient = RestClient.builder().baseUrl(baseUrl).build();
         this.lagQuery = lagQuery;
+        this.emqxDropQuery = emqxDropQuery;
     }
 
     public long getConsumerLag() {
@@ -28,7 +31,7 @@ public class PrometheusClient {
     }
 
     public double getEmqxDropRate() {
-        return queryDouble("rate(emqx_actions_dropped[1m])");
+        return queryDouble(emqxDropQuery);
     }
 
     private long queryScalar(String query) {

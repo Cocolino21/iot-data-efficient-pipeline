@@ -9,7 +9,7 @@ export const useTrafficControlStore = defineStore('trafficControl', () => {
   const emqxSettings = ref(null)
   const emqxState = ref(null)
   const calibrationSettings = ref(null)
-  const calibrationState = ref([])
+  const calibrationState = ref({ items: [], total: 0, page: 0, size: 20 })
   const loading = ref(false)
   const error = ref(null)
 
@@ -106,9 +106,11 @@ export const useTrafficControlStore = defineStore('trafficControl', () => {
     } finally { loading.value = false }
   }
 
-  async function refreshCalibrationState() {
+  const calibrationQuery = ref('')
+
+  async function refreshCalibrationState(page = calibrationState.value.page, size = calibrationState.value.size) {
     try {
-      calibrationState.value = await api.getCalibrationState()
+      calibrationState.value = await api.getCalibrationState(page, size, calibrationQuery.value)
     } catch {
       // silently ignore — status bar already shows the error
     }
@@ -116,7 +118,7 @@ export const useTrafficControlStore = defineStore('trafficControl', () => {
 
   return {
     controller, pid, hysteresis,
-    emqxSettings, emqxState, calibrationSettings, calibrationState,
+    emqxSettings, emqxState, calibrationSettings, calibrationState, calibrationQuery,
     loading, error,
     fetchAll, fetchStatus, startPolling, stopPolling,
     saveController, savePid, saveHysteresis, saveEmqxSettings,

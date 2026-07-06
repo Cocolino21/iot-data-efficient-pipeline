@@ -14,3 +14,10 @@ scrape_configs:
     metrics_path: "/api/v5/prometheus/stats"
     static_configs:
       - targets: ["emqx-dt:18083"]
+
+  # Rule-engine / Kafka bridge action metrics (emqx_action_*, emqx_rule_*)
+  # live on a separate endpoint than the broker stats above.
+  - job_name: "emqx-data-integration"
+    metrics_path: "/api/v5/prometheus/data_integration"
+    static_configs:
+      - targets: ["emqx-dt:18083"]
