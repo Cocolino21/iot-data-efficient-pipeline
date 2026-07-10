@@ -1,5 +1,6 @@
 package com.licenta.traffic_control.web;
 
+import com.licenta.traffic_control.config.ReconstructionSettings;
 import com.licenta.traffic_control.reconstruction.ReconstructionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,7 @@ public class DatastreamController {
 
     private final JdbcTemplate jdbc;
     private final ReconstructionService reconstructionService;
+    private final ReconstructionSettings reconstructionSettings;
 
     // Whitelist: tier name -> continuous aggregate view. The view name is never
     // taken from raw user input.
@@ -70,23 +72,27 @@ public class DatastreamController {
     @GetMapping("/{id}/raw")
     public List<Map<String, Object>> raw(
             @PathVariable String id,
-            @RequestParam(defaultValue = "15") int minutes) {
-        int safeMinutes = Math.min(Math.max(minutes, 1), 180);
+            @RequestParam(required = false) Long from,
+            @RequestParam(required = false) Long to) {
+        long toMs = to != null ? to : System.currentTimeMillis();
+        long fromMs = from != null ? from : toMs - 15 * 60_000L;
         return jdbc.queryForList("""
                 SELECT "timestamp", value
                 FROM observation
-                WHERE datastream_id = ? AND "timestamp" > NOW() - make_interval(mins => ?)
+                WHERE datastream_id = ? AND "timestamp" BETWEEN ? AND ?
                 ORDER BY "timestamp"
                 LIMIT 10000
-                """, id, safeMinutes);
+                """, id, new Timestamp(fromMs), new Timestamp(toMs));
     }
 
     @GetMapping("/{id}/reconstructed")
     public Map<String, Object> reconstructed(
             @PathVariable String id,
-            @RequestParam(defaultValue = "15") int minutes) {
-        int safeMinutes = Math.min(Math.max(minutes, 1), 180);
-        return reconstructionService.reconstruct(id, safeMinutes);
+            @RequestParam(required = false) Long from,
+            @RequestParam(required = false) Long to) {
+        long toMs = to != null ? to : System.currentTimeMillis();
+        long fromMs = from != null ? from : toMs - 15 * 60_000L;
+        return reconstructionService.reconstruct(id, fromMs, toMs);
     }
 
     @GetMapping("/{id}/aggregates")
@@ -104,19 +110,43 @@ public class DatastreamController {
         Instant toTs = to != null ? Instant.ofEpochMilli(to) : Instant.now();
         Instant fromTs = from != null ? Instant.ofEpochMilli(from) : toTs.minus(7, ChronoUnit.DAYS);
 
-        // energy_hourly carries no avg_value column; derive it. The coarser
-        // tiers materialize avg_value directly.
-        String avgExpr = "hourly".equals(tier)
-                ? "total_value / NULLIF(sample_count, 0)"
-                : "avg_value";
+        if ("hourly".equals(tier)) {
+            // Baseline-adjusted average: coverage-weighted blend of the
+            // measured average and the hour-of-day expectation. Full-coverage
+            // hours keep their data; sparse (heavily PIP-shed) hours are
+            // pulled toward the baseline. NULL when the stream has no baseline.
+            return jdbc.queryForList("""
+                    SELECT h.bucket,
+                           h.total_value / NULLIF(h.sample_count, 0) AS avg_value,
+                           h.min_value, h.max_value, h.sample_count,
+                           b.expected_value,
+                           LEAST(1.0, h.sample_count / ?) AS coverage,
+                           LEAST(1.0, h.sample_count / ?) * (h.total_value / NULLIF(h.sample_count, 0))
+                             + (1 - LEAST(1.0, h.sample_count / ?)) * b.expected_value AS adjusted_avg
+                    FROM energy_hourly h
+                    LEFT JOIN device_baseline b
+                      ON  b.datastream_id = h.datastream_id
+                      AND b.hour_of_day   = EXTRACT(HOUR FROM h.bucket)::INT
+                      AND b.minute_bucket = 0
+                    WHERE h.datastream_id = ? AND h.bucket BETWEEN ? AND ?
+                    ORDER BY h.bucket
+                    LIMIT 2000
+                    """,
+                    reconstructionSettings.getSamplesPerHour(),
+                    reconstructionSettings.getSamplesPerHour(),
+                    reconstructionSettings.getSamplesPerHour(),
+                    id, Timestamp.from(fromTs), Timestamp.from(toTs));
+        }
 
+        // Coarser tiers materialize avg_value directly; no baseline blending
+        // (the baseline is hour-of-day resolution).
         return jdbc.queryForList("""
-                SELECT bucket, %s AS avg_value, min_value, max_value, sample_count
+                SELECT bucket, avg_value, min_value, max_value, sample_count
                 FROM %s
                 WHERE datastream_id = ? AND bucket BETWEEN ? AND ?
                 ORDER BY bucket
                 LIMIT 2000
-                """.formatted(avgExpr, view),
+                """.formatted(view),
                 id, Timestamp.from(fromTs), Timestamp.from(toTs));
     }
 }

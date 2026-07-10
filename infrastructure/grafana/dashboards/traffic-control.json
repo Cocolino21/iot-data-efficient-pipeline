@@ -1027,6 +1027,259 @@
       ],
       "title": "PIP adjustments broadcast (%)",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 200,
+      "title": "Ingest Latency (event-time \u2192 DB arrival)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "timescaledb"
+      },
+      "description": "Average ingest latency over the last minute for the selected datastream(s). Only meaningful for live sensors; UK-DALE replays historical timestamps.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 5000
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 43
+      },
+      "id": 201,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "timescaledb"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT avg(EXTRACT(EPOCH FROM (ingested_at - \"timestamp\"))) * 1000 AS \"latency (ms)\"\nFROM observation\nWHERE ingested_at > now() - interval '1 minute'\n  AND ('${datastream}' IN ('All','') OR datastream_id = '${datastream}');",
+          "refId": "A"
+        }
+      ],
+      "title": "Current avg latency (last 1m)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "timescaledb"
+      },
+      "description": "Ingest latency (ms) bucketed on real arrival time. avg / p95 / max across the selected datastream(s).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "latency",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 18,
+        "x": 6,
+        "y": 43
+      },
+      "id": 202,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "timescaledb"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(ingested_at, $__interval),\n  avg(EXTRACT(EPOCH FROM (ingested_at - \"timestamp\"))) * 1000 AS \"avg (ms)\",\n  percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - \"timestamp\"))) * 1000 AS \"p95 (ms)\",\n  max(EXTRACT(EPOCH FROM (ingested_at - \"timestamp\"))) * 1000 AS \"max (ms)\"\nFROM observation\nWHERE $__timeFilter(ingested_at)\n  AND ('${datastream}' IN ('All','') OR datastream_id = '${datastream}')\nGROUP BY 1\nORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Ingest latency over time (avg / p95 / max)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "timescaledb"
+      },
+      "description": "Slowest recent observations by ingest latency for the selected datastream(s).",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "latency (ms)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "id": 203,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "timescaledb"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT datastream_id,\n       \"timestamp\" AS event_time,\n       ingested_at,\n       EXTRACT(EPOCH FROM (ingested_at - \"timestamp\")) * 1000 AS \"latency (ms)\"\nFROM observation\nWHERE $__timeFilter(ingested_at)\n  AND ('${datastream}' IN ('All','') OR datastream_id = '${datastream}')\nORDER BY (ingested_at - \"timestamp\") DESC\nLIMIT 20;",
+          "refId": "A"
+        }
+      ],
+      "title": "Slowest recent observations",
+      "type": "table"
     }
   ],
   "preload": false,
@@ -1036,7 +1289,30 @@
     "iot"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "allValue": "All",
+        "current": {
+          "text": "All",
+          "value": "All"
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "timescaledb"
+        },
+        "definition": "SELECT DISTINCT datastream_id FROM observation ORDER BY 1",
+        "includeAll": true,
+        "label": "Datastream",
+        "multi": false,
+        "name": "datastream",
+        "options": [],
+        "query": "SELECT DISTINCT datastream_id FROM observation ORDER BY 1",
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-15m",

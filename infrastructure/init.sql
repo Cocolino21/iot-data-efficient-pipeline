@@ -169,13 +169,37 @@ CREATE TABLE IF NOT EXISTS observation
     DOUBLE
     PRECISION
     NOT
+    NULL,
+    -- DB-side arrival time, stamped when the row lands in TimescaleDB.
+    -- clock_timestamp() (real per-row wall time) is used instead of now(),
+    -- which would return the transaction start and be identical for every
+    -- row in a sink-service batch. Latency = ingested_at - "timestamp".
+    ingested_at
+    TIMESTAMPTZ
+    NOT
     NULL
+    DEFAULT
+    clock_timestamp
+(
+)
 );
 
 SELECT create_hypertable('observation', 'timestamp', if_not_exists => TRUE);
 
 CREATE INDEX IF NOT EXISTS idx_observation_datastream
     ON observation (datastream_id, "timestamp" DESC);
+
+-- Supports Grafana latency queries that range over real arrival time.
+CREATE INDEX IF NOT EXISTS idx_observation_ingested
+    ON observation (ingested_at DESC);
+
+-- Convenience view: per-observation ingest latency in seconds.
+CREATE OR REPLACE VIEW observation_latency AS
+SELECT datastream_id,
+       "timestamp",
+       ingested_at,
+       EXTRACT(EPOCH FROM (ingested_at - "timestamp")) AS latency_seconds
+FROM observation;
 
 ALTER TABLE observation SET (
     timescaledb.compress,

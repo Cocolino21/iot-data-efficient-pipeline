@@ -5,24 +5,22 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Gap reconstruction for PIP-filtered streams. Energy streams (identified by
- * {@code datastream.observation_type = 'energy'}, declared by the device and
- * written at registration) use the device baseline's hour-of-day shape;
- * everything else — and energy streams whose current data drifts too far from
- * their baseline to trust it — falls back to linear interpolation.
+ * Gap handling for PIP-filtered streams: raw-level gaps get linear
+ * interpolation; the baseline enters only at the hourly aggregate level as a
+ * coverage-weighted adjustment.
  */
 @Getter
 @Setter
 @ConfigurationProperties(prefix = "reconstruction")
 public class ReconstructionSettings {
-    /** A gap longer than this many seconds gets reconstructed points. */
+    /** A gap longer than this many seconds gets interpolated points. */
     private int gapSeconds = 5;
     /** Cap on synthetic points generated per gap. */
     private int maxPointsPerGap = 60;
     /**
-     * Baseline trust gate: if the stream's relative drift over the last 24 h
-     * exceeds this, reconstruction falls back to interpolation until a
-     * calibration cycle rebuilds the baseline.
+     * Full-coverage sample count for one hourly bucket (1 Hz sensors -> 3600).
+     * Coverage = sample_count / this, capped at 1; it weights measured average
+     * vs baseline expectation in the adjusted hourly aggregate.
      */
-    private double maxDrift = 0.15;
+    private double samplesPerHour = 3600;
 }

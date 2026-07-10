@@ -1,5 +1,5 @@
 {
-  "device_count": 10,
+  "device_count": 500,
   "device_prefix": "device",
   "mqtt_broker": "tcp://localhost:1883",
   "raw_broker": "tcp://localhost:1884",
@@ -7,39 +7,15 @@
   "status_port": 8090,
   "sensors": [
     {
-      "datastream_id": "mains_t10",
+      "datastream_id": "ukdale-2000",
       "type": "ukdale",
-      "interval": "10ms",
-      "dataset_dir": "../data/ukdale/house_1"
-    },
-    {
-      "datastream_id": "mains_t11",
-      "type": "ukdale",
-      "interval": "10ms",
-      "dataset_dir": "../data/ukdale/house_1"
-    },
-    {
-      "datastream_id": "mains_t12",
-      "type": "ukdale",
-      "interval": "10ms",
-      "dataset_dir": "../data/ukdale/house_1"
-    },
-    {
-      "datastream_id": "mains_t13",
-      "type": "ukdale",
-      "interval": "10ms",
-      "dataset_dir": "../data/ukdale/house_1"
-    },
-    {
-      "datastream_id": "mains_t14",
-      "type": "ukdale",
-      "interval": "10ms",
+      "interval": "2ms",
       "dataset_dir": "../data/ukdale/house_1"
     }
   ],
   "pip": {
     "cache_size": 200,
-    "threshold": 0.1,
+    "threshold": 0.0,
     "max_interval": "30s"
   }
 }

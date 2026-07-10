@@ -159,6 +159,52 @@ Static NodePorts (also reachable at `http://<minikube ip>:<port>`):
 | traffic-control  | 30082    |
 | core-service     | 30083    |
 
+## Ingest latency (event-time → DB arrival)
+
+The `observation` table has an `ingested_at TIMESTAMPTZ DEFAULT clock_timestamp()` column,
+stamped by TimescaleDB when each row lands (the sink-service COPY doesn't set it, so the
+default fills it). Latency = `ingested_at - "timestamp"`, exposed via the
+`observation_latency` view and the **Ingest Latency** row of the Traffic Control Grafana
+dashboard (`infrastructure/grafana/dashboards/traffic-control.json`).
+
+> Only trustworthy for live sensors. UK-DALE datastreams replay the dataset's original
+> historical timestamps, so their "latency" is meaningless — filter them out with the
+> dashboard's `Datastream` variable.
+
+A **fresh** `docker compose ... down -v` + `up -d` picks up the column automatically
+(`init.sql` defines it in `CREATE TABLE`, before compression is enabled). For an
+**existing** DB, compression blocks adding a column with a non-constant default, so migrate
+in two steps:
+
+```powershell
+docker exec -i infrastructure-timescaledb-1 psql -U postgres -d iot -p 5433 -c @'
+ALTER TABLE observation ADD COLUMN IF NOT EXISTS ingested_at TIMESTAMPTZ;
+ALTER TABLE observation ALTER COLUMN ingested_at SET DEFAULT clock_timestamp();
+CREATE INDEX IF NOT EXISTS idx_observation_ingested ON observation (ingested_at DESC);
+CREATE OR REPLACE VIEW observation_latency AS
+SELECT datastream_id, "timestamp", ingested_at,
+       EXTRACT(EPOCH FROM (ingested_at - "timestamp")) AS latency_seconds
+FROM observation;
+'@
+```
+
+Existing rows keep `ingested_at = NULL` (no latency history); new inserts get the default.
+
+### Provision the dashboard (k8s)
+
+Dashboards are provisioned from a ConfigMap built out of `infrastructure/grafana/dashboards/`.
+After adding/editing a JSON there, recreate the ConfigMap and bounce Grafana:
+
+```powershell
+kubectl create configmap grafana-dashboards -n iot `
+  --from-file=infrastructure/grafana/dashboards/ `
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl rollout restart deployment/grafana -n iot
+```
+
+The `TimescaleDB` datasource (uid `timescaledb`, defined in `k8s/grafana.yaml`) backs the
+dashboard's SQL panels.
+
 ## Shutdown
 
 ```powershell

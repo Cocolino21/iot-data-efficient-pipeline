@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+// replayYear replaces the dataset timestamps' year on replay. Note: if the
+// dataset spans multiple years, they all fold onto this one.
+const replayYear = 2026
+
 // UKDale streams readings from a UK-DALE style .dat file: each line is
 // "<unix_timestamp> <value> [extra columns...]" separated by whitespace.
 // field[0] is the real timestamp, field[1] is the value (active power for mains.dat).
@@ -70,8 +74,13 @@ func (u *UKDale) ReadValue() Reading {
 
 		sec := int64(tsFloat)
 		nsec := int64((tsFloat - float64(sec)) * 1e9)
+		ts := time.Unix(sec, nsec).UTC()
+		// Keep the dataset's month/day/time-of-day (preserves the diurnal and
+		// weekly shape) but pin the year to the present so retention, aggregate
+		// refresh, and drift windows all see the data as recent.
+		ts = time.Date(replayYear, ts.Month(), ts.Day(), ts.Hour(), ts.Minute(), ts.Second(), ts.Nanosecond(), time.UTC)
 		return Reading{
-			Timestamp: time.Unix(sec, nsec),
+			Timestamp: ts,
 			Value:     val,
 		}
 	}

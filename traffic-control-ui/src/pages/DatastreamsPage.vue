@@ -28,13 +28,14 @@ const TOOLTIP = {
 const LEGEND = { textStyle: { color: '#94A3B8', fontSize: 11 }, top: 0, icon: 'roundRect', itemWidth: 12, itemHeight: 8 }
 
 const DAY_MS = 86_400_000
-const RANGES = {
-  '24h': DAY_MS,
-  '7d': 7 * DAY_MS,
-  '30d': 30 * DAY_MS,
-  '90d': 90 * DAY_MS,
-  '1y': 365 * DAY_MS,
+
+// <input type="datetime-local"> <-> epoch ms (local time)
+function toLocalInput(ms) {
+  const d = new Date(ms)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
+const fromLocalInput = (s) => new Date(s).getTime()
 
 const list = ref({ items: [], total: 0, page: 0, size: 20 })
 const selected = ref(null)
@@ -42,13 +43,20 @@ const baseline = ref([])
 const actualByHour = ref({})
 const aggregates = ref([])
 const aggTier = ref('hourly')
-const aggRange = ref('7d')
+// Display toggle: blend the baseline into sparse hourly buckets (adjusted_avg
+// comes precomputed from the API; toggling only shows/hides the series).
+const showAdjusted = ref(true)
+const aggFrom = ref('')
+const aggTo = ref('')
 const aggLoaded = ref(false)
 const aggLoading = ref(false)
 const recon = ref(null) // { points: [{timestamp,value,reconstructed}], method, ... }
-const rawMinutes = ref(15)
+const rawFrom = ref('')
+const rawTo = ref('')
 const rawLoaded = ref(false)
 const rawLoading = ref(false)
+const baselineDay = ref('') // yyyy-mm-dd; actuals for this day vs the current baseline
+const baselineLoading = ref(false)
 const triggerMsg = ref('')
 
 const query = ref('')
@@ -75,25 +83,41 @@ async function select(row) {
   aggLoaded.value = false
   recon.value = null
   rawLoaded.value = false
-  baseline.value = await api.getBaseline(row.datastream_id)
-  // Actual hourly averages over the last 24 h, keyed by hour-of-day, to
-  // overlay against the baseline's expected hour-of-day profile.
+  // Default pickers: baseline day = today, raw = last 15 min, aggregates = last 7 days.
   const now = Date.now()
-  const rows = await api.getAggregates(row.datastream_id, 'hourly', now - DAY_MS, now)
-  const byHour = {}
-  for (const r of rows) byHour[new Date(r.bucket).getHours()] = r.avg_value
-  actualByHour.value = byHour
+  baselineDay.value = toLocalInput(now).slice(0, 10)
+  rawFrom.value = toLocalInput(now - 15 * 60_000)
+  rawTo.value = toLocalInput(now)
+  aggFrom.value = toLocalInput(now - 7 * DAY_MS)
+  aggTo.value = toLocalInput(now)
+  await loadBaselineActual()
+}
+
+// Actual hourly averages for the picked day, keyed by hour-of-day, overlaid
+// against the CURRENT baseline profile (the comparison target never changes).
+async function loadBaselineActual() {
+  if (!selected.value) return
+  baselineLoading.value = true
+  try {
+    baseline.value = await api.getBaseline(selected.value.datastream_id)
+    const dayStart = fromLocalInput(`${baselineDay.value}T00:00`)
+    const rows = await api.getAggregates(selected.value.datastream_id, 'hourly', dayStart, dayStart + DAY_MS)
+    const byHour = {}
+    for (const r of rows) byHour[new Date(r.bucket).getHours()] = r.avg_value
+    actualByHour.value = byHour
+  } finally {
+    baselineLoading.value = false
+  }
 }
 
 // Explicit commit: aggregates only refetch on the Load button, never live as
 // the tier/range selects change.
 async function loadAggregates() {
-  if (!selected.value) return
+  if (!selected.value || !aggFrom.value || !aggTo.value) return
   aggLoading.value = true
   try {
-    const now = Date.now()
     aggregates.value = await api.getAggregates(
-      selected.value.datastream_id, aggTier.value, now - RANGES[aggRange.value], now)
+      selected.value.datastream_id, aggTier.value, fromLocalInput(aggFrom.value), fromLocalInput(aggTo.value))
     aggLoaded.value = true
   } finally {
     aggLoading.value = false
@@ -102,10 +126,11 @@ async function loadAggregates() {
 
 // Explicit commit, same as the aggregates card: only refetch on Load.
 async function loadRaw() {
-  if (!selected.value) return
+  if (!selected.value || !rawFrom.value || !rawTo.value) return
   rawLoading.value = true
   try {
-    recon.value = await api.getReconstructed(selected.value.datastream_id, rawMinutes.value)
+    recon.value = await api.getReconstructed(
+      selected.value.datastream_id, fromLocalInput(rawFrom.value), fromLocalInput(rawTo.value))
     rawLoaded.value = true
   } finally {
     rawLoading.value = false
@@ -143,7 +168,7 @@ const baselineOption = computed(() => {
         itemStyle: { color: C_EXPECTED, borderRadius: [4, 4, 0, 0] },
       },
       {
-        name: 'Actual (last 24 h)',
+        name: 'Actual (selected day)',
         type: 'line',
         data: actual,
         lineStyle: { width: 2, color: C_ACTUAL },
@@ -210,9 +235,13 @@ const rawOption = computed(() => {
 const aggOption = computed(() => {
   const rows = aggregates.value
   const ts = (r) => +new Date(r.bucket)
+  const hasAdjusted = showAdjusted.value && rows.some((r) => r.adjusted_avg != null)
+  const legendItems = hasAdjusted
+    ? ['Average', 'Adjusted (baseline)', 'Min–max range']
+    : ['Average', 'Min–max range']
   return {
     grid: { left: 52, right: 16, top: 34, bottom: 28 },
-    legend: { ...LEGEND, data: ['Average', 'Min–max range'] },
+    legend: { ...LEGEND, data: legendItems },
     tooltip: {
       trigger: 'axis',
       ...TOOLTIP,
@@ -221,9 +250,13 @@ const aggOption = computed(() => {
         const r = rows[i]
         if (!r) return ''
         const fmt = (v) => (v != null ? Number(v).toFixed(2) : '—')
-        return `${new Date(ts(r)).toLocaleString()}<br/>` +
+        let s = `${new Date(ts(r)).toLocaleString()}<br/>` +
           `avg ${fmt(r.avg_value)} · min ${fmt(r.min_value)} · max ${fmt(r.max_value)}<br/>` +
           `${r.sample_count} samples`
+        if (hasAdjusted && r.adjusted_avg != null) {
+          s += `<br/>adjusted ${fmt(r.adjusted_avg)} (coverage ${(r.coverage * 100).toFixed(0)}%)`
+        }
+        return s
       },
     },
     xAxis: { type: 'time', ...AXIS, splitLine: { show: false } },
@@ -259,6 +292,14 @@ const aggOption = computed(() => {
         itemStyle: { color: C_ACTUAL },
         showSymbol: false,
       },
+      ...(hasAdjusted ? [{
+        name: 'Adjusted (baseline)',
+        type: 'line',
+        data: rows.map((r) => [ts(r), r.adjusted_avg]),
+        lineStyle: { width: 2, color: C_EXPECTED },
+        itemStyle: { color: C_EXPECTED },
+        showSymbol: false,
+      }] : []),
     ],
   }
 })
@@ -326,18 +367,22 @@ const aggOption = computed(() => {
           <p v-if="triggerMsg" class="trigger-msg">{{ triggerMsg }}</p>
         </SettingsCard>
 
-        <SettingsCard title="Baseline vs actual" subtitle="Expected hour-of-day profile against the last 24 h">
+        <SettingsCard title="Baseline vs actual" subtitle="Current baseline profile against a chosen day's actuals">
+          <template #actions>
+            <input v-model="baselineDay" type="date" class="select" />
+            <button class="btn btn-primary" :disabled="baselineLoading" @click="loadBaselineActual">
+              {{ baselineLoading ? 'Loading…' : 'Load' }}
+            </button>
+          </template>
           <VChart v-if="baseline.length" class="chart" :option="baselineOption" :update-options="{ notMerge: true }" autoresize />
           <p v-else class="empty">No baseline yet — run a calibration to build one</p>
         </SettingsCard>
 
-        <SettingsCard title="Raw data" subtitle="Measured points (PIP-filtered) with gaps reconstructed">
+        <SettingsCard title="Raw data" subtitle="Measured points (PIP-filtered), gaps linearly interpolated">
           <template #actions>
-            <select v-model.number="rawMinutes" class="select">
-              <option :value="5">Last 5 min</option>
-              <option :value="15">Last 15 min</option>
-              <option :value="60">Last 60 min</option>
-            </select>
+            <input v-model="rawFrom" type="datetime-local" class="select" />
+            <span class="range-sep">→</span>
+            <input v-model="rawTo" type="datetime-local" class="select" />
             <button class="btn btn-primary" :disabled="rawLoading" @click="loadRaw">
               {{ rawLoading ? 'Loading…' : 'Load' }}
             </button>
@@ -352,15 +397,18 @@ const aggOption = computed(() => {
 
         <SettingsCard title="Aggregates" subtitle="Continuous-aggregate tiers" class="wide">
           <template #actions>
+            <label v-if="aggTier === 'hourly'" class="check">
+              <input type="checkbox" v-model="showAdjusted" /> Baseline adjust
+            </label>
             <select v-model="aggTier" class="select">
               <option value="hourly">Hourly</option>
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
             </select>
-            <select v-model="aggRange" class="select">
-              <option v-for="(_, k) in RANGES" :key="k" :value="k">Last {{ k }}</option>
-            </select>
+            <input v-model="aggFrom" type="datetime-local" class="select" />
+            <span class="range-sep">→</span>
+            <input v-model="aggTo" type="datetime-local" class="select" />
             <button class="btn btn-primary" :disabled="aggLoading" @click="loadAggregates">
               {{ aggLoading ? 'Loading…' : 'Load' }}
             </button>
@@ -461,6 +509,24 @@ const aggOption = computed(() => {
   margin: 6px 0 0;
   font-size: 11px;
   color: var(--text-faint);
+}
+.range-sep {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.check input { accent-color: var(--indigo); }
+input.select[type='datetime-local'],
+input.select[type='date'] {
+  color-scheme: dark;
 }
 .chart { width: 100%; height: 260px; }
 .chart-tall { height: 320px; }

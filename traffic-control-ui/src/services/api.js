@@ -48,8 +48,8 @@ export const api = {
   // Datastream inspector
   getDatastreams(page = 0, size = 20, q = '') { return request(`/api/datastreams?page=${page}&size=${size}&q=${encodeURIComponent(q)}`) },
   getBaseline(datastreamId) { return request(`/api/datastreams/${encodeURIComponent(datastreamId)}/baseline`) },
-  getRaw(datastreamId, minutes = 15) { return request(`/api/datastreams/${encodeURIComponent(datastreamId)}/raw?minutes=${minutes}`) },
-  getReconstructed(datastreamId, minutes = 15) { return request(`/api/datastreams/${encodeURIComponent(datastreamId)}/reconstructed?minutes=${minutes}`) },
+  getRaw(datastreamId, fromMs, toMs) { return request(`/api/datastreams/${encodeURIComponent(datastreamId)}/raw?from=${Math.floor(fromMs)}&to=${Math.floor(toMs)}`) },
+  getReconstructed(datastreamId, fromMs, toMs) { return request(`/api/datastreams/${encodeURIComponent(datastreamId)}/reconstructed?from=${Math.floor(fromMs)}&to=${Math.floor(toMs)}`) },
   getAggregates(datastreamId, tier, fromMs, toMs) {
     return request(`/api/datastreams/${encodeURIComponent(datastreamId)}/aggregates?tier=${tier}&from=${Math.floor(fromMs)}&to=${Math.floor(toMs)}`)
   },

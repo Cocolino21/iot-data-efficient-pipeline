@@ -9,6 +9,8 @@ data:
     deleteDatasources:
       - name: Prometheus
         orgId: 1
+      - name: TimescaleDB
+        orgId: 1
     datasources:
       - name: Prometheus
         type: prometheus
@@ -35,11 +37,12 @@ data:
         type: postgres
         access: proxy
         url: host.minikube.internal:5433
+        uid: timescaledb
         user: postgres
-        database: iot
         secureJsonData:
           password: postgres
         jsonData:
+          database: iot
           sslmode: disable
           postgresVersion: 1500
           timescaledb: true
