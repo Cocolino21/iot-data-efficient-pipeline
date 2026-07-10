@@ -11,14 +11,8 @@ import (
 	"time"
 )
 
-// replayYear replaces the dataset timestamps' year on replay. Note: if the
-// dataset spans multiple years, they all fold onto this one.
 const replayYear = 2026
 
-// UKDale streams readings from a UK-DALE style .dat file: each line is
-// "<unix_timestamp> <value> [extra columns...]" separated by whitespace.
-// field[0] is the real timestamp, field[1] is the value (active power for mains.dat).
-// The file is read line-by-line (constant memory) and loops back to the start at EOF.
 type UKDale struct {
 	interval time.Duration
 	path     string
@@ -26,7 +20,6 @@ type UKDale struct {
 	scanner  *bufio.Scanner
 }
 
-// NewUKDale opens dir/file for streaming. file defaults to "mains.dat" when empty.
 func NewUKDale(interval time.Duration, dir, file string) (*UKDale, error) {
 	if file == "" {
 		file = "mains.dat"
@@ -49,7 +42,6 @@ func (u *UKDale) ReadValue() Reading {
 
 	for {
 		if !u.scanner.Scan() {
-			// EOF (or error): loop back to the start of the file.
 			u.file.Seek(0, io.SeekStart)
 			u.scanner = bufio.NewScanner(u.file)
 			if !u.scanner.Scan() {
@@ -60,7 +52,7 @@ func (u *UKDale) ReadValue() Reading {
 
 		fields := strings.Fields(u.scanner.Text())
 		if len(fields) < 2 {
-			continue // skip blank/garbled lines
+			continue
 		}
 
 		tsFloat, err := strconv.ParseFloat(fields[0], 64)
@@ -75,9 +67,6 @@ func (u *UKDale) ReadValue() Reading {
 		sec := int64(tsFloat)
 		nsec := int64((tsFloat - float64(sec)) * 1e9)
 		ts := time.Unix(sec, nsec).UTC()
-		// Keep the dataset's month/day/time-of-day (preserves the diurnal and
-		// weekly shape) but pin the year to the present so retention, aggregate
-		// refresh, and drift windows all see the data as recent.
 		ts = time.Date(replayYear, ts.Month(), ts.Day(), ts.Hour(), ts.Minute(), ts.Second(), ts.Nanosecond(), time.UTC)
 		return Reading{
 			Timestamp: ts,

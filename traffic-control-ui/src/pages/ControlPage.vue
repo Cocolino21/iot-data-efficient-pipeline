@@ -14,10 +14,8 @@ const MODES = [
   { key: 'NONE',       label: 'Off' },
 ]
 
-// Which mode is currently driving the loop (from the backend).
 const activeMode = computed(() => controller.value?.mode ?? 'NONE')
 
-// Which mode's parameters the user is looking at — independent of what's active.
 const viewedMode = ref(null)
 
 const pidForm = ref({})
@@ -28,7 +26,6 @@ const pollSeconds = ref(10)
 const saved = ref(false)
 const pollSaved = ref(false)
 
-// Seed the viewed tab from the active mode on first load.
 watch(controller, (v) => {
   if (v) {
     if (viewedMode.value === null) viewedMode.value = v.mode ?? 'NONE'
@@ -53,7 +50,6 @@ async function saveParams() {
   } else if (viewedMode.value === 'HYSTERESIS') {
     await store.saveHysteresis(hystForm.value)
   }
-  // The dead-zone gate is controller-level; persist it alongside.
   await store.saveController({ deadZone: deadZone.value })
   flashSaved()
 }
@@ -146,7 +142,6 @@ async function savePollInterval() {
       </SettingsCard>
     </div>
 
-    <!-- PID parameters -->
     <SettingsCard v-if="viewedMode === 'PID'" title="PID Parameters" class="params-card">
       <template #actions>
         <span v-if="isViewingActive" class="running-tag">● Running</span>
@@ -250,7 +245,6 @@ async function savePollInterval() {
       </div>
     </SettingsCard>
 
-    <!-- Off -->
     <SettingsCard v-else title="Loop Disabled" class="params-card">
       <template #actions>
         <span v-if="isViewingActive" class="running-tag off">● Off</span>
@@ -283,14 +277,12 @@ async function savePollInterval() {
   gap: 20px;
 }
 .params-card { margin-top: 20px; }
-/* Consumer Lag is the dominant chart; EMQX messages sits narrower beside it. */
 .charts-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 20px;
 }
 
-/* Mode selector */
 .mode-help {
   margin: 0 0 14px;
   font-size: 12px;

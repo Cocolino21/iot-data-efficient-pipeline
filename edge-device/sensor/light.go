@@ -31,7 +31,6 @@ func (l *Light) ReadValue() Reading {
 	now := time.Now()
 	hour := float64(now.Hour()) + float64(now.Minute())/60.0
 
-	// natural daylight: sinusoidal, peaks at noon, zero at night
 	daylight := 0.0
 	if hour >= 6 && hour <= 18 {
 		daylight = math.Max(0, 200*math.Sin(math.Pi*(hour-6)/12))

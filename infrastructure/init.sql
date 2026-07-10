@@ -140,13 +140,6 @@ CREATE TABLE IF NOT EXISTS datastream
 )
     );
 
--- thing_id, sensor_id, observed_property_id are intentionally nullable:
--- the sink-service auto-registers unknown datastreams with minimal info
--- so that high-throughput COPY inserts never fail on FK violations.
--- These columns are filled in later via the management API.
-
--- Auto-register placeholder datastream rows for unknown IDs.
--- Called by the sink-service before each batch COPY into observation.
 CREATE OR REPLACE FUNCTION ensure_datastreams(ids TEXT[])
     RETURNS void AS $$
     INSERT INTO datastream (datastream_id, name)
@@ -170,10 +163,6 @@ CREATE TABLE IF NOT EXISTS observation
     PRECISION
     NOT
     NULL,
-    -- DB-side arrival time, stamped when the row lands in TimescaleDB.
-    -- clock_timestamp() (real per-row wall time) is used instead of now(),
-    -- which would return the transaction start and be identical for every
-    -- row in a sink-service batch. Latency = ingested_at - "timestamp".
     ingested_at
     TIMESTAMPTZ
     NOT
@@ -307,7 +296,6 @@ RETURNS TABLE (
     max_value         DOUBLE PRECISION,
     sample_count      BIGINT
 ) AS $$
--- Head: hourly granularity for the first (possibly partial) day
 SELECT bucket,
        datastream_id,
        total_value,
@@ -321,7 +309,6 @@ WHERE bucket >= from_ts
 
 UNION ALL
 
--- Body: daily granularity for full days in between
 SELECT bucket,
        datastream_id,
        total_value,
@@ -335,7 +322,6 @@ WHERE bucket >= date_trunc('day', from_ts) + interval '1 day'
 
 UNION ALL
 
--- Tail: hourly granularity for the last partial day (only if different day)
 SELECT bucket,
        datastream_id,
        total_value,
@@ -386,33 +372,23 @@ CREATE TABLE IF NOT EXISTS device_baseline
 )
     );
 
--- ── Calibration / baseline-collection orchestration ──────────────────────────
--- Replaces the old per-observation baseline_delta_log + delta-batch +
--- baseline-drift-check. The baseline is now rebuilt from genuine full ("raw")
--- collection days (cbl_* below); drift is detected cheaply from an hourly
--- continuous aggregate instead of a per-reading delta table.
-
--- One row per datastream: the orchestrator's work list + active lease.
 CREATE TABLE IF NOT EXISTS calibration_state
 (
     datastream_id     TEXT PRIMARY KEY REFERENCES datastream (datastream_id),
     thing_id          TEXT,
-    status            TEXT NOT NULL DEFAULT 'idle',   -- 'idle' | 'collecting'
-    needs_calibration BOOLEAN NOT NULL DEFAULT FALSE, -- set by flag-needs-calibration
-    drift_score       DOUBLE PRECISION DEFAULT 0,    -- magnitude of drift; higher = more urgent
+    status            TEXT NOT NULL DEFAULT 'idle',
+    needs_calibration BOOLEAN NOT NULL DEFAULT FALSE,
+    drift_score       DOUBLE PRECISION DEFAULT 0,
     flagged_at        TIMESTAMPTZ,
     lease_started_at  TIMESTAMPTZ,
     lease_expires_at  TIMESTAMPTZ,
     last_collected_at TIMESTAMPTZ
 );
 
--- Partial index: orchestrator picks top-N by drift score in O(log n)
 CREATE INDEX IF NOT EXISTS idx_calibration_priority
     ON calibration_state (drift_score DESC)
     WHERE needs_calibration = TRUE AND status = 'idle';
 
--- One pre-aggregated value per (datastream, collected full day, hour-of-day).
--- Filled from a full raw collection day; CBL averages the last X of these.
 CREATE TABLE IF NOT EXISTS cbl_day_bucket
 (
     datastream_id TEXT NOT NULL REFERENCES datastream (datastream_id),
@@ -422,21 +398,18 @@ CREATE TABLE IF NOT EXISTS cbl_day_bucket
     PRIMARY KEY (datastream_id, day, hour_of_day)
 );
 
--- pg_cron drift detection (optional — CalibrationOrchestrator handles this too)
 DO $$
 BEGIN
     CREATE EXTENSION IF NOT EXISTS pg_cron;
 
     PERFORM cron.schedule('flag-needs-calibration', '0 * * * *', $cron$
 
-        -- 1. ensure every datastream the devices emit has a calibration_state row
         INSERT INTO calibration_state (datastream_id, thing_id)
         SELECT DISTINCT h.datastream_id, ds.thing_id::TEXT
         FROM energy_hourly h
         LEFT JOIN datastream ds ON ds.datastream_id = h.datastream_id
         ON CONFLICT (datastream_id) DO NOTHING;
 
-        -- 2. DRIFT: recent hourly averages sitting far from the baseline
         UPDATE calibration_state cs
         SET needs_calibration = TRUE, drift_score = d.drift_score, flagged_at = NOW()
         FROM (
@@ -452,14 +425,13 @@ BEGIN
             GROUP BY h.datastream_id
         ) d
         WHERE cs.datastream_id   = d.datastream_id
-          AND d.drift_score      > 0.3      -- DRIFT_THRESHOLD (raw units; tune per sensor)
-          AND d.n_hours          > 24       -- MIN_HOURS
+          AND d.drift_score      > 0.3
+          AND d.n_hours          > 24
           AND cs.status            = 'idle'
           AND cs.needs_calibration = FALSE
           AND (cs.last_collected_at IS NULL
-               OR cs.last_collected_at < NOW() - interval '1 day');   -- cooldown
+               OR cs.last_collected_at < NOW() - interval '1 day');
 
-        -- 3. COLD START: datastreams that have no baseline yet (highest priority)
         UPDATE calibration_state cs
         SET needs_calibration = TRUE, drift_score = 9999, flagged_at = NOW()
         WHERE cs.status = 'idle'
@@ -472,8 +444,6 @@ EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'pg_cron not available — skipping scheduled drift detection (CalibrationOrchestrator handles it)';
 END;
 $$;
--- hour (the "DX / last-X-days" CBL). Called by the orchestrator after a
--- collection day completes.
 CREATE OR REPLACE FUNCTION cbl_rebuild_baseline(p_datastream TEXT, p_x_days INT)
     RETURNS void AS $$
     INSERT INTO device_baseline (datastream_id, hour_of_day, minute_bucket, expected_value, recorded_at)
@@ -490,8 +460,6 @@ CREATE OR REPLACE FUNCTION cbl_rebuild_baseline(p_datastream TEXT, p_x_days INT)
     DO UPDATE SET expected_value = EXCLUDED.expected_value, recorded_at = NOW();
 $$ LANGUAGE SQL;
 
--- Aggregate one completed collection window's raw observations into one row per
--- hour-of-day in cbl_day_bucket. Called by the orchestrator on lease reclaim.
 CREATE OR REPLACE FUNCTION cbl_ingest_day(p_datastream TEXT, p_from TIMESTAMPTZ, p_to TIMESTAMPTZ)
     RETURNS void AS $$
     INSERT INTO cbl_day_bucket (datastream_id, day, hour_of_day, avg_value)
@@ -514,13 +482,9 @@ BEGIN
         FROM calibration_state
         WHERE status = 'collecting' AND lease_expires_at <= NOW()
     LOOP
-        -- Summarize raw observations into cbl_day_bucket
         PERFORM cbl_ingest_day(r.datastream_id, r.lease_started_at, r.lease_expires_at);
-
-        -- Rebuild baseline from last X collection days
         PERFORM cbl_rebuild_baseline(r.datastream_id, p_x_days);
 
-        -- Release the lease
         UPDATE calibration_state
         SET status = 'idle',
             needs_calibration = FALSE,

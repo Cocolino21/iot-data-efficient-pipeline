@@ -24,9 +24,9 @@ type sensorEntry struct {
 	datasetDir     string
 	datasetFile    string
 	enabled        bool
-	rawActive      bool    // currently in raw/calibration mode
-	rawGen         int     // generation guard for the TTL timer
-	savedThreshold float64 // threshold to restore when raw mode ends
+	rawActive      bool
+	rawGen         int
+	savedThreshold float64
 }
 
 type Manager struct {
@@ -67,7 +67,7 @@ func (m *Manager) startSensor(entry *sensorEntry) {
 					}
 				}
 
-				fmt.Printf("[%s] value=%.2f forwarded=%v\n", entry.datastreamID, reading.Value, forward)
+				log.Printf("[%s] value=%.2f forwarded=%v", entry.datastreamID, reading.Value, forward)
 			}
 		}
 	}()
@@ -224,10 +224,6 @@ func (m *Manager) DisableSensor(datastreamID string) error {
 	return nil
 }
 
-// threshold bounds: PIP threshold is kept within [minThreshold, maxThreshold].
-// minThreshold 0 = forward everything (no reduction); maxThreshold 1 = forward nothing.
-// minRiseThreshold is the lift-off base used when an increase is applied to a
-// threshold at/near 0 — the update is multiplicative, so 0 * anything stays 0.
 const (
 	minThreshold     = 0.00
 	maxThreshold     = 1.00
@@ -244,9 +240,6 @@ func clampThreshold(v float64) float64 {
 	return v
 }
 
-// adjustThreshold applies a percentage change to the current threshold. When
-// increasing from at/near zero, it lifts the base to minRiseThreshold first so
-// the multiplicative update can take effect (0 * anything would stay 0).
 func adjustThreshold(current, percentage float64) float64 {
 	base := current
 	if percentage > 0 && base < minRiseThreshold {
@@ -262,10 +255,6 @@ func (m *Manager) AdjustThreshold(datastreamID string, percentage float64) error
 	if datastreamID == "" {
 		for id, entry := range m.sensors {
 			if entry.rawActive {
-				// Calibrating: PIP is bypassed so the live threshold is
-				// irrelevant, but keep savedThreshold tracking the broadcasts
-				// peers receive so we restore to a peer-consistent value when
-				// raw mode ends.
 				old := entry.savedThreshold
 				entry.savedThreshold = adjustThreshold(old, percentage)
 				log.Printf("[%s] RAW: folded %+.0f%% into saved threshold %.4f -> %.4f", id, percentage, old, entry.savedThreshold)
@@ -426,15 +415,6 @@ func (m *Manager) HandleControlMessage(_ string, payload []byte) {
 	}
 }
 
-// EnterRawMode disables PIP thresholding for the given datastream (or all
-// datastreams when datastreamID is empty) so it publishes every reading, then
-// auto-reverts after ttlSeconds and restores the previous threshold. The TTL is
-// self-enforced on the device, so a missed/lost "revert" command can never
-// strand a stream in raw mode. While raw, shed/relax commands are ignored.
-//
-// Safe on the broadcast topic: if this manager does not own the datastream
-// (e.g. a broadcast targeting another device in the multi-simulator), it is a
-// silent no-op.
 func (m *Manager) EnterRawMode(datastreamID string, ttlSeconds int) {
 	if ttlSeconds <= 0 {
 		log.Printf("raw mode: invalid ttl_s %d, ignoring", ttlSeconds)
@@ -466,12 +446,9 @@ func (m *Manager) EnterRawMode(datastreamID string, ttlSeconds int) {
 	if entry, ok := m.sensors[datastreamID]; ok {
 		arm(datastreamID, entry)
 	}
-	// otherwise: not this device's datastream — ignore silently.
+	// otherwise: not this device's datastream - ignore silently.
 }
 
-// exitRawMode is fired by a stream's TTL timer. It only reverts if this is still
-// the most recent raw window for the stream (rawGen guard), so a stale timer
-// from a superseded window can't cut a newer one short.
 func (m *Manager) exitRawMode(datastreamID string, gen int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -532,7 +509,6 @@ func (m *Manager) Stop() {
 	m.wg.Wait()
 }
 
-// SensorStatus is a snapshot of a single sensor's runtime state.
 type SensorStatus struct {
 	DatastreamID string  `json:"datastream_id"`
 	Type         string  `json:"type"`

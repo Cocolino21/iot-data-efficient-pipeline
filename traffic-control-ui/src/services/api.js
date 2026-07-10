@@ -54,9 +54,7 @@ export const api = {
     return request(`/api/datastreams/${encodeURIComponent(datastreamId)}/aggregates?tier=${tier}&from=${Math.floor(fromMs)}&to=${Math.floor(toMs)}`)
   },
 
-  // Fixed build/config facts (queries, smoothing windows)
   getMeta()           { return request('/api/meta') },
 
-  // Test
   publishPip(pct)     { return request(`/api/test/pip?pct=${pct}`, { method: 'POST' }) },
 }

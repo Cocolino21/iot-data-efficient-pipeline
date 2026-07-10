@@ -10,8 +10,6 @@ import { api } from '@/services/api.js'
 
 use([CanvasRenderer, LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent])
 
-// Two-series palette validated (dataviz six checks) against the dark panel
-// surface #10202B: Go blue = actual/average, amber = expected baseline.
 const C_ACTUAL = '#0092B8'
 const C_EXPECTED = '#D97706'
 
@@ -29,7 +27,6 @@ const LEGEND = { textStyle: { color: '#94A3B8', fontSize: 11 }, top: 0, icon: 'r
 
 const DAY_MS = 86_400_000
 
-// <input type="datetime-local"> <-> epoch ms (local time)
 function toLocalInput(ms) {
   const d = new Date(ms)
   const pad = (n) => String(n).padStart(2, '0')
@@ -43,8 +40,6 @@ const baseline = ref([])
 const actualByHour = ref({})
 const aggregates = ref([])
 const aggTier = ref('hourly')
-// Display toggle: blend the baseline into sparse hourly buckets (adjusted_avg
-// comes precomputed from the API; toggling only shows/hides the series).
 const showAdjusted = ref(true)
 const aggFrom = ref('')
 const aggTo = ref('')
@@ -93,8 +88,6 @@ async function select(row) {
   await loadBaselineActual()
 }
 
-// Actual hourly averages for the picked day, keyed by hour-of-day, overlaid
-// against the CURRENT baseline profile (the comparison target never changes).
 async function loadBaselineActual() {
   if (!selected.value) return
   baselineLoading.value = true
@@ -110,8 +103,6 @@ async function loadBaselineActual() {
   }
 }
 
-// Explicit commit: aggregates only refetch on the Load button, never live as
-// the tier/range selects change.
 async function loadAggregates() {
   if (!selected.value || !aggFrom.value || !aggTo.value) return
   aggLoading.value = true
@@ -124,7 +115,6 @@ async function loadAggregates() {
   }
 }
 
-// Explicit commit, same as the aggregates card: only refetch on Load.
 async function loadRaw() {
   if (!selected.value || !rawFrom.value || !rawTo.value) return
   rawLoading.value = true
@@ -179,8 +169,6 @@ const baselineOption = computed(() => {
   }
 })
 
-// Measured points solid blue (line broken across gaps); reconstructed points
-// dashed amber, anchored to the bracketing measured points so segments join.
 const rawOption = computed(() => {
   const pts = recon.value?.points ?? []
   const measured = pts.map((p) => [p.timestamp, p.reconstructed ? null : p.value])
@@ -262,8 +250,6 @@ const aggOption = computed(() => {
     xAxis: { type: 'time', ...AXIS, splitLine: { show: false } },
     yAxis: { type: 'value', ...AXIS, splitNumber: 4, scale: true },
     series: [
-      // Invisible floor + stacked delta = the min–max envelope of the bucket,
-      // drawn in the average's own hue at low alpha (same entity, not a new category).
       {
         name: 'min-floor',
         type: 'line',

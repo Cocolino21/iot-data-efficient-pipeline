@@ -8,7 +8,7 @@ import (
 
 type Temperature struct {
 	interval time.Duration
-	hvac     float64 // current HVAC perturbation, drifts over time
+	hvac     float64
 }
 
 func NewTemperature(interval time.Duration) *Temperature {

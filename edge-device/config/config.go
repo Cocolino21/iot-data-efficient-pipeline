@@ -11,12 +11,12 @@ type SensorConfig struct {
 	Type         string `json:"type"`
 	Interval     string `json:"interval"`
 	Enabled      *bool  `json:"enabled,omitempty"`
-	DatasetDir   string `json:"dataset_dir,omitempty"`  // for type "ukdale": the house folder
-	DatasetFile  string `json:"dataset_file,omitempty"` // for type "ukdale": defaults to mains.dat
+	DatasetDir   string `json:"dataset_dir,omitempty"`
+	DatasetFile  string `json:"dataset_file,omitempty"`
 }
 
 type MQTTConfig struct {
-	Broker     string `json:"broker,omitempty"` // legacy single-broker field
+	Broker     string `json:"broker,omitempty"`
 	DTBroker   string `json:"dt_broker,omitempty"`
 	RawBroker  string `json:"raw_broker,omitempty"`
 	PublishRaw bool   `json:"publish_raw"`

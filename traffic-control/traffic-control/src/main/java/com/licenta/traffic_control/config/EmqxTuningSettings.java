@@ -18,13 +18,11 @@ public class EmqxTuningSettings {
     private double dropRateThreshold = 1.0;
     private int cooldownPolls = 3;
 
-    // defaults (what EMQX normally runs with)
     private String defaultMaxLingerTime = "20ms";
     private String defaultMaxLingerBytes = "1MB";
     private String defaultMaxBatchBytes = "1MB";
     private int defaultMaxInflight = 32;
 
-    // upper limits (pushed when drops detected)
     private String upperMaxLingerTime = "50ms";
     private String upperMaxLingerBytes = "4MB";
     private String upperMaxBatchBytes = "4MB";

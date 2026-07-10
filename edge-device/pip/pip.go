@@ -41,8 +41,6 @@ func (f *Filter) SetThreshold(t float64) {
 	f.mu.Unlock()
 }
 
-// SetBypass toggles raw mode. While bypassed, Process forwards every reading
-// (no PIP thresholding).
 func (f *Filter) SetBypass(b bool) {
 	f.mu.Lock()
 	f.bypass = b

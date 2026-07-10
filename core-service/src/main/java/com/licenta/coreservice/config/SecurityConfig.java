@@ -1,7 +1,7 @@
 package com.licenta.coreservice.config;
 
-import com.licenta.coreservice.auth.JwtAuthFilter;
-import com.licenta.coreservice.auth.OidcLoginSuccessHandler;
+import com.licenta.coreservice.security.JwtAuthFilter;
+import com.licenta.coreservice.security.OidcLoginSuccessHandler;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
